@@ -1,4 +1,5 @@
-# Technical requirements
+# P8_Project/Immersive Experiences 
+## Technical requirements
 
 Unity Version: Unity 6000.3.6f1
 
