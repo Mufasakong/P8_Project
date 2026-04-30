@@ -778,7 +778,7 @@ AnimatorController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: AnimCTRL_Male
+  m_Name: AnimCTRL
   serializedVersion: 5
   m_AnimatorParameters:
   - m_Name: lean_forward
@@ -914,9 +914,9 @@ AnimatorController:
     m_Mask: {fileID: 31900000, guid: 16784fa7313641847b5fb70d5b27d23b, type: 2}
     m_Motions: []
     m_Behaviours: []
-    m_BlendingMode: 1
+    m_BlendingMode: 0
     m_SyncedLayerIndex: -1
-    m_DefaultWeight: 0.38
+    m_DefaultWeight: 1
     m_IKPass: 0
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}

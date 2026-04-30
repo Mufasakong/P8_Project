@@ -4696,7 +4696,7 @@ PrefabInstance:
     - target: {fileID: 5589263983493483704, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 737a72930d375ea4b890572bedcadf5d, type: 2}
+      objectReference: {fileID: 22100000, guid: e89ef3e2b1b9ee84993205e893dd5a1c, type: 2}
     - target: {fileID: 5589263983493483704, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
       propertyPath: m_UpdateMode
       value: 1
