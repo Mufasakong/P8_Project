@@ -300,8 +300,8 @@ const BC_ACTION_COOLDOWN: Record<BcAction, number> = {
   NodSmall: 1200,
   nrub: 2500,
   shrugandshake: 2000,
-  seatAdjustment: 3000,
-  shoulderwarmup: 2500,
+  seatAdjustment: 5000,
+  shoulderwarmup: 4000,
   ChinRub: 2500,
 };
 
@@ -434,7 +434,7 @@ function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
       return {
           type: "bc_trigger",
           npc,
-          action: "NodSmall"
+          action: Math.random() < 0.8 ? "NodSmall" : "nrub"
       };
   }
 
