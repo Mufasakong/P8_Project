@@ -276,7 +276,7 @@ type BcFeaturesMsg = {
   agentsSpeaking?: { HR?: boolean; TECH?: boolean };
 };
 
-type BcAction = "NodSmall" | "nrub" | "shrugandshake" | "seatAdjustment" | "shoulderwarmup";
+type BcAction = "NodSmall" | "nrub" | "shrugandshake" | "seatAdjustment" | "shoulderwarmup" | "ChinRub";
 
 type BcTriggerMsg = {
   type: "bc_trigger";
@@ -294,14 +294,14 @@ type BcState = {
 const BC_MICROPAUSE_MIN = 250;
 const BC_MICROPAUSE_MAX = 700;
 const BC_EOT_THRESHOLD = 1000;      // treat > this as end-of-turn 
-const BC_GLOBAL_COOLDOWN = 2500;    
+const BC_GLOBAL_COOLDOWN = 1500;    
 const BC_NPC_COOLDOWN = 5000;       
 const BC_ACTION_COOLDOWN: Record<BcAction, number> = {
-  NodSmall: 4000,
-  nrub: 7000,
-  shrugandshake: 7000,
-  seatAdjustment: 8000,
-  shoulderwarmup: 8000,
+  NodSmall: 2000,
+  nrub: 4000,
+  shrugandshake: 3000,
+  seatAdjustment: 5000,
+  shoulderwarmup: 4000,
 };
 
 function nowMs() {
@@ -367,23 +367,23 @@ function chooseBackchannelAction(msg: BcFeaturesMsg): BcAction | null {
     0.20 * (1 - speechConfidence),
   );
 
-  if (turnYield > 0.62 && speechConfidence > 0.45 && uncertainty < 0.65) {
+  if (turnYield > 0.40 && speechConfidence > 0.45 && uncertainty < 0.40) {
     return "NodSmall";
   }
 
-  if (questionLike > 0.65 && uncertainty > 0.55 && turnYield < 0.55) {
+  if (questionLike > 0.40 && uncertainty > 0.55 && turnYield < 0.55) {
     return "shrugandshake";
   }
 
-  if (uncertainty > 0.68 && speechConfidence < 0.55) {
+  if (uncertainty > 0.40 && speechConfidence < 0.40) {
     return "nrub";
   }
 
-  if (fatigueOrDisengagement > 0.65 && engagementScore < 0.45) {
+  if (fatigueOrDisengagement > 0.40 && engagementScore < 0.35) {
     return "seatAdjustment";
   }
 
-  if (strain > 0.66 && msg.speechMs > 1200 && engagementScore > 0.45) {
+  if (strain > 0.40 && msg.speechMs > 1200 && engagementScore > 0.45) {
     return "shoulderwarmup";
   }
 
