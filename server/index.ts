@@ -291,17 +291,18 @@ type BcState = {
 };
 
 // --- Changable things for the mic(amount of times a BC can be triggered etc. ALL IN MS) ---
-const BC_MICROPAUSE_MIN = 250;
-const BC_MICROPAUSE_MAX = 700;
+const BC_MICROPAUSE_MIN = 150;
+const BC_MICROPAUSE_MAX = 500;
 const BC_EOT_THRESHOLD = 1000;      // treat > this as end-of-turn 
-const BC_GLOBAL_COOLDOWN = 1500;    
-const BC_NPC_COOLDOWN = 5000;       
+const BC_GLOBAL_COOLDOWN = 800;    
+const BC_NPC_COOLDOWN = 2500;       
 const BC_ACTION_COOLDOWN: Record<BcAction, number> = {
-  NodSmall: 2000,
-  nrub: 4000,
-  shrugandshake: 3000,
-  seatAdjustment: 5000,
-  shoulderwarmup: 4000,
+  NodSmall: 1200,
+  nrub: 2500,
+  shrugandshake: 2000,
+  seatAdjustment: 3000,
+  shoulderwarmup: 2500,
+  ChinRub: 2500,
 };
 
 function nowMs() {
@@ -426,7 +427,16 @@ function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
   if (t - st.lastPerNpcTs[npc] < BC_NPC_COOLDOWN) return null;
 
   const action = chooseBackchannelAction(msg);
-  if (!action) return null;
+  if (!action) {
+      // Fallback: default to a subtle nod when no specific condition matches
+      st.lastGlobalTs = t;    
+      st.lastPerNpcTs[npc] = t;   
+      return {
+          type: "bc_trigger",
+          npc,
+          action: "NodSmall"
+      };
+  }
 
   if (t - st.lastPerActionTs[action] < BC_ACTION_COOLDOWN[action]) return null;
 
