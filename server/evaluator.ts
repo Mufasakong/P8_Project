@@ -26,7 +26,7 @@ export type InterviewEvaluationOutput = {
   transcriptTurns: number;
 };
 
-function findMostRecentParticipantId(lines: string[]): string | null {
+export function findMostRecentParticipantId(lines: string[]): string | null {
   for (let index = lines.length - 1; index >= 0; index--) {
     const line = lines[index];
     if (!line) continue;
@@ -49,7 +49,7 @@ function findMostRecentParticipantId(lines: string[]): string | null {
   return null;
 }
 
-function extractLikelyJson(raw: string): string | null {
+export function extractLikelyJson(raw: string): string | null {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fenced?.[1]) return fenced[1].trim();
 
@@ -60,7 +60,7 @@ function extractLikelyJson(raw: string): string | null {
   return null;
 }
 
-function normalizeEvaluation(parsed: unknown): InterviewEvaluation {
+export function normalizeEvaluation(parsed: unknown): InterviewEvaluation {
   const obj = (parsed && typeof parsed === "object") ? (parsed as Record<string, unknown>) : {};
 
   const rawScore = typeof obj.score === "number" ? obj.score : Number(obj.score ?? 0);
@@ -76,7 +76,7 @@ function normalizeEvaluation(parsed: unknown): InterviewEvaluation {
   };
 }
 
-function parseEvaluationResponse(raw: string): InterviewEvaluation {
+export function parseEvaluationResponse(raw: string): InterviewEvaluation {
   const candidate = extractLikelyJson(raw);
   if (!candidate) throw new Error("Evaluator did not return JSON.");
 

@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "bun run index.ts",
-    "dev": "bun run index.ts --watch"
+    "dev": "bun run index.ts --watch",
+    "test": "bun test"
   },
   "peerDependencies": {
     "typescript": "^5"
