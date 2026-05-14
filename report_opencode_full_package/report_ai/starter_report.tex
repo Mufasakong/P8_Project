@@ -1,0 +1,130 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5}
+}
+
+\title{Stereo-Aware Audio Signal Processing for Speech Activity and Prosody Analysis}
+\author{Mubarik Jamal Muuse}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report presents a stereo-aware audio signal-processing system for analysing speech activity, prosody, and spectral structure from uploaded audio clips and optional live audio streams. The system uses a browser-based dashboard with a Python backend. The dashboard supports mono and stereo audio, channel selection, classical preprocessing filters, waveform and spectrogram visualisation, stereo diagnostics, and exportable filter experiments. The main focus of the report is the signal-processing pipeline rather than the Unity application layer. Unity support is treated as an optional extension.
+\end{abstract}
+
+\section{Introduction}
+Interactive audio systems require robust processing of microphone or recorded audio signals before higher-level behaviour can be inferred. Raw audio contains variations in gain, background noise, channel balance, spectral content, and silence. The goal of this project is to design and evaluate a stereo-aware signal-processing pipeline that can extract useful speech and prosody features while making the effect of preprocessing filters visible and measurable.
+
+The project was re-framed from an application-specific Unity backchannel system into a browser-first signal-processing dashboard. The Unity/WebSocket connection remains supported, but the main contribution is the signal-processing pipeline and its evaluation.
+
+\section{System Overview}
+The system consists of a Python backend and a browser dashboard. The backend performs offline clip analysis and optional live WebSocket analysis. The browser provides upload, playback, filter control, waveform display, spectrograms, stereo diagnostics, and export of measurements.
+
+The system distinguishes between two signal paths:
+\begin{enumerate}
+    \item \textbf{Playback path:} runs in the browser and allows high-pass, low-pass, and band-pass filter parameters to be changed while listening.
+    \item \textbf{Analysis path:} runs in Python and recomputes features such as STFT, mel spectrogram, MFCCs, pitch, VAD, and before/after metrics after pressing \emph{Process clip}.
+\end{enumerate}
+
+\section{Stereo Audio Representation}
+A mono signal contains one discrete-time waveform $x[n]$. A stereo signal contains two waveforms: left $L[n]$ and right $R[n]$. The dashboard supports several analysis modes:
+\begin{align}
+    x_{\text{mix}}[n] &= \frac{L[n] + R[n]}{2}, \\
+    x_{\text{mid}}[n] &= \frac{L[n] + R[n]}{2}, \\
+    x_{\text{side}}[n] &= \frac{L[n] - R[n]}{2}.
+\end{align}
+Left and right channels can also be analysed individually. This makes it possible to compare channel balance, correlation, and stereo width.
+
+\section{Signal Processing Methods}
+
+\subsection{Sampling and Framing}
+Audio is represented as a sampled discrete-time signal. The backend uses a target sampling rate of \SI{16000}{Hz}. A \SI{20}{ms} frame contains
+\begin{equation}
+N_{\text{frame}} = 16000 \cdot 0.020 = 320
+\end{equation}
+samples. Feature values are emitted at approximately \SI{10}{Hz}, and a longer rolling window is used for spectral and prosodic analysis.
+
+\subsection{RMS Energy and Decibels}
+The root-mean-square energy of a frame is
+\begin{equation}
+\mathrm{RMS} = \sqrt{\frac{1}{N}\sum_{n=0}^{N-1} x[n]^2}.
+\end{equation}
+The energy in decibels is computed as
+\begin{equation}
+\mathrm{RMS}_{\mathrm{dB}} = 20\log_{10}(\mathrm{RMS}+\epsilon).
+\end{equation}
+
+\subsection{Short-Time Fourier Transform}
+The short-time Fourier transform represents local frequency content:
+\begin{equation}
+X(m,k)=\sum_n x[n]w[n-mH]e^{-j2\pi kn/N},
+\end{equation}
+where $w[n]$ is the analysis window, $H$ is the hop size, $m$ is the frame index, and $k$ is the frequency bin.
+
+\subsection{Spectral Features}
+The system extracts spectral centroid, rolloff, flatness, flux, and energy ratios. The spectral centroid is
+\begin{equation}
+C = \frac{\sum_k f_k |X[k]|}{\sum_k |X[k]|}.
+\end{equation}
+Spectral flux measures frame-to-frame spectral change and can be written as
+\begin{equation}
+F_m = \sqrt{\sum_k \max(|X_m[k]|-|X_{m-1}[k]|,0)^2}.
+\end{equation}
+
+\subsection{Mel Spectrogram and MFCCs}
+A mel spectrogram maps power spectra through mel-scaled filters and converts power to decibels. MFCCs are then computed from the log-mel energies using a cosine transform. These features compactly represent the broad spectral envelope of the signal.
+
+\subsection{Filtering}
+The dashboard supports high-pass, low-pass, and band-pass filters. These filters are used to remove unwanted frequency regions and to demonstrate how filtering changes the spectrum. The analysis focuses on serious preprocessing filters: high-pass, low-pass, band-pass, noise suppression, normalization, and pre-emphasis.
+
+\subsection{Pitch and Voice Activity Detection}
+Pitch-related features include mean fundamental frequency, pitch slope, and voiced ratio. The VAD uses an adaptive noise estimate and an SNR-like ratio, combined with hangover logic to avoid rapid switching.
+
+\section{Implementation}
+The implementation consists of a Python backend and browser frontend. The backend loads audio, applies selected analysis filters, computes features, produces mel spectrograms and spectra, and exports results. The browser visualizes the waveform, spectrograms, before/after metrics, filter experiments, and stereo diagnostics.
+
+\section{Evaluation}
+\subsection{Filter Experiment}
+A report-ready filter experiment processes the same audio clip under multiple conditions: raw input, high-pass, low-pass, band-pass, spectral noise suppression, RMS normalization, pre-emphasis, and the currently selected filter configuration. The output table includes RMS dB, spectral centroid, low-band ratio, speech-band ratio, high-band ratio, spectral flatness, speech confidence, speech-like ratio, processing time, and speed factor.
+
+Example results from a stereo footstep clip showed that the band-pass filter increased the speech-band energy ratio while reducing low-frequency and high-frequency energy. These values should be replaced or verified using the exported CSV before final submission.
+
+\subsection{Stereo Diagnostics}
+Stereo diagnostics include channel count, left/right RMS, left/right balance, left/right correlation, mid RMS, side RMS, and stereo width. These measurements indicate whether a file is true stereo or effectively dual mono.
+
+\subsection{Processing Time}
+Processing-time measurements are used to determine whether the analysis is practical relative to the audio duration. The speed factor is computed as audio duration divided by processing time.
+
+\section{Discussion}
+The system demonstrates a complete signal-processing workflow from stereo audio input to classical filter analysis, spectral feature extraction, and quantitative measurement. The main limitation is that playback filtering and backend analysis are separate paths, so changing a live playback filter does not automatically update the Python-computed analysis plots until the clip is processed again.
+
+\section{Conclusion}
+This project developed a stereo-aware audio signal-processing dashboard for speech and prosody analysis. The system supports channel selection, classical preprocessing filters, STFT-based spectral analysis, mel spectrograms, MFCCs, pitch and voicing features, adaptive noise estimation, VAD, stereo diagnostics, and processing-time evaluation. The result is a browser-first signal-processing system with optional Unity/WebSocket support.
+
+\appendix
+\section{Optional Unity Support}
+The system can support Unity as a live audio client through a WebSocket server. Unity can send PCM16 audio frames to the server and receive feature JSON in return. This is treated as an optional extension rather than the main contribution of the project.
+
+\section{Material Kept Outside the Main Report}
+Earlier experiments involving machine learning and backchannel prediction are not the main focus of this signal-processing report. They may be discussed as future work or moved to supplementary material if needed.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,10 @@
+from pathlib import Path
+
+AMI_AUDIO_ROOT = Path(r"M:\spisMubarik")
+AMI_MANUAL_ROOT = Path(r"C:\Users\mubar\Desktop\SPIS\Ami_manual")
+WORDS_DIR = AMI_MANUAL_ROOT / "words"
+OUT_DIR = Path(r"M:\SPIS_AMI_outputs")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+print(AMI_AUDIO_ROOT.exists())
+print(WORDS_DIR.exists())

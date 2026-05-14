@@ -2840,7 +2840,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: com.whisper.unity::Whisper.WhisperManager
   logLevel: 1
-  modelPath: Whisper/ggml-base.en.bin
+  modelPath: Whisper/ggml-tiny.bin
   isModelPathInStreamingAssets: 1
   initOnAwake: 1
   useGpu: 1
@@ -2887,10 +2887,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6b88e632ef755d4d8a887f234fee276, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LlmManager
-  serverUrl: ws://100.105.197.101:3001
+  serverUrl: ws://127.0.0.1:3001
   useElevenLabsAudio: 0
   elevenLabsAudioSource: {fileID: 0}
-  defaultEvaluatorModel: qwen2.5:14b
+  defaultEvaluatorModel: qwen3:0.6b
 --- !u!114 &1354645187
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2903,7 +2903,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35b8775cea1adaa4a94b410c9c982c63, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProsodyClient
-  pythonUrl: ws://100.105.197.101:8765
+  pythonUrl: ws://127.0.0.1:8765
   sampleRate: 16000
   frameMs: 20
 --- !u!1001 &1390849971

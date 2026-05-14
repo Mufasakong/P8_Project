@@ -1,0 +1,213 @@
+{
+  "type": "filter_experiment",
+  "filename": "harvard.wav",
+  "sampleRate": 16000,
+  "channelCount": 2,
+  "channelMode": "mixdown",
+  "audioDurationSec": 18.35625,
+  "totalProcessingTimeSec": 59.8795602999744,
+  "filterConfig": {
+    "highpass_hz": 80,
+    "lowpass_hz": 4000,
+    "band_low_hz": 80,
+    "band_high_hz": 4000,
+    "echo_delay_ms": 220,
+    "echo_feedback": 0.35
+  },
+  "noiseExperiment": {
+    "enabled": false,
+    "snr_db": 10,
+    "seed": 42,
+    "type": "white"
+  },
+  "stereo": {
+    "channelCount": 2,
+    "channelNames": [
+      "left",
+      "right"
+    ],
+    "channelRms": [
+      0.05601217597723007,
+      0.05601215362548828
+    ],
+    "channelRmsDb": [
+      -25.03435095304367,
+      -25.034354419161428
+    ],
+    "leftRmsDb": -25.03435095304367,
+    "rightRmsDb": -25.034354419161428,
+    "balanceDbLeftMinusRight": 0.0000034661177572559154,
+    "leftRightCorrelation": 0.9999999743980237,
+    "midRmsDb": -25.034352108416105,
+    "sideRmsDb": -103.85365726581759,
+    "stereoWidth": 0.00011452948646897064
+  },
+  "rows": [
+    {
+      "id": "raw",
+      "condition": "Raw input",
+      "filters": [],
+      "rmsDb": -25.034352263332504,
+      "rmsDbChange": 0,
+      "spectralCentroidHz": 1672.7008296217753,
+      "spectralCentroidChangeHz": 0,
+      "spectralRolloffHz": 3086.720452069717,
+      "spectralFlatness": 0.051387686282396317,
+      "spectralFlux": 3.034097909927368,
+      "zcr": 0.13213196864111498,
+      "lowEnergyRatio": 0.048435423112186446,
+      "speechEnergyRatio": 0.7945113777027143,
+      "highEnergyRatio": 0.15705319918509936,
+      "meanSpeechConfidence": 8.464396409402,
+      "meanBoundaryConfidence": 0.051630434782608696,
+      "voicedFrameRatio": 0.9184782608695652,
+      "speechLikeRatio": 0.9510869565217391,
+      "processingTimeSec": 8.232445900037419,
+      "speedFactor": 2.229744382518999
+    },
+    {
+      "id": "highpass",
+      "condition": "High-pass 80 Hz",
+      "filters": [
+        "highpass"
+      ],
+      "rmsDb": -28.75582647592495,
+      "rmsDbChange": -3.721474212592444,
+      "spectralCentroidHz": 2028.4668271847024,
+      "spectralCentroidChangeHz": 355.76599756292717,
+      "spectralRolloffHz": 3666.1900871459693,
+      "spectralFlatness": 0.07288694381713867,
+      "spectralFlux": 2.0674099922180176,
+      "zcr": 0.1872686193379791,
+      "lowEnergyRatio": 0.00005979528595234922,
+      "speechEnergyRatio": 0.8330138945841283,
+      "highEnergyRatio": 0.16692631012991932,
+      "meanSpeechConfidence": 10.996420286814013,
+      "meanBoundaryConfidence": 0.07391304347826087,
+      "voicedFrameRatio": 0.9510869565217391,
+      "speechLikeRatio": 0.9510869565217391,
+      "processingTimeSec": 8.858190400002059,
+      "speedFactor": 2.0722347534995107
+    },
+    {
+      "id": "lowpass",
+      "condition": "Low-pass 4000 Hz",
+      "filters": [
+        "lowpass"
+      ],
+      "rmsDb": -25.139846145852225,
+      "rmsDbChange": -0.10549388251972047,
+      "spectralCentroidHz": 947.4027072207743,
+      "spectralCentroidChangeHz": -725.2981224010009,
+      "spectralRolloffHz": 1854.2517701525055,
+      "spectralFlatness": 0.014095687307417393,
+      "spectralFlux": 2.82132887840271,
+      "zcr": 0.0762943706445993,
+      "lowEnergyRatio": 0.05760212312588423,
+      "speechEnergyRatio": 0.9422524336086986,
+      "highEnergyRatio": 0.000145443265417185,
+      "meanSpeechConfidence": 7.632768112064294,
+      "meanBoundaryConfidence": 0.051630434782608696,
+      "voicedFrameRatio": 0.9184782608695652,
+      "speechLikeRatio": 0.9565217391304348,
+      "processingTimeSec": 8.50494549999712,
+      "speedFactor": 2.1583030720192404
+    },
+    {
+      "id": "bandpass",
+      "condition": "Band-pass 80-4000 Hz",
+      "filters": [
+        "bandpass"
+      ],
+      "rmsDb": -29.00246937746911,
+      "rmsDbChange": -3.968117114136607,
+      "spectralCentroidHz": 1209.9707199652328,
+      "spectralCentroidChangeHz": -462.7301096565425,
+      "spectralRolloffHz": 2215.2947984749453,
+      "spectralFlatness": 0.014118468388915062,
+      "spectralFlux": 1.819236397743225,
+      "zcr": 0.11802285224303136,
+      "lowEnergyRatio": 0.00007051733843430599,
+      "speechEnergyRatio": 0.9997808039918421,
+      "highEnergyRatio": 0.00014867866972392716,
+      "meanSpeechConfidence": 11.879673504687533,
+      "meanBoundaryConfidence": 0.08288043478260869,
+      "voicedFrameRatio": 0.9456521739130435,
+      "speechLikeRatio": 0.9565217391304348,
+      "processingTimeSec": 8.892100199998822,
+      "speedFactor": 2.0643323384955146
+    },
+    {
+      "id": "noise",
+      "condition": "Spectral noise suppression",
+      "filters": [
+        "noise"
+      ],
+      "rmsDb": -25.042182863234252,
+      "rmsDbChange": -0.007830599901748059,
+      "spectralCentroidHz": 1438.8571342780058,
+      "spectralCentroidChangeHz": -233.84369534376947,
+      "spectralRolloffHz": 2494.638480392157,
+      "spectralFlatness": 0.10846715420484543,
+      "spectralFlux": 2.986910820007324,
+      "zcr": 0.11611396178135888,
+      "lowEnergyRatio": 0.04651598706205005,
+      "speechEnergyRatio": 0.7957850914668219,
+      "highEnergyRatio": 0.1576989214711281,
+      "meanSpeechConfidence": 12.85487565729199,
+      "meanBoundaryConfidence": 0.05298913043478261,
+      "voicedFrameRatio": 0.9184782608695652,
+      "speechLikeRatio": 0.9347826086956522,
+      "processingTimeSec": 8.535219400015194,
+      "speedFactor": 2.1506477033229308
+    },
+    {
+      "id": "normalize",
+      "condition": "RMS normalization",
+      "filters": [
+        "normalize"
+      ],
+      "rmsDb": -20.26774334247908,
+      "rmsDbChange": 4.766608920853425,
+      "spectralCentroidHz": 1672.7182817075688,
+      "spectralCentroidChangeHz": 0.01745208579359314,
+      "spectralRolloffHz": 3086.61832788671,
+      "spectralFlatness": 0.04977947100996971,
+      "spectralFlux": 5.337919235229492,
+      "zcr": 0.13213196864111498,
+      "lowEnergyRatio": 0.04843542332354915,
+      "speechEnergyRatio": 0.794511375800968,
+      "highEnergyRatio": 0.157053200875483,
+      "meanSpeechConfidence": 12.555209891642296,
+      "meanBoundaryConfidence": 0.050815217391304346,
+      "voicedFrameRatio": 0.9184782608695652,
+      "speechLikeRatio": 0.9619565217391305,
+      "processingTimeSec": 8.525368199974764,
+      "speedFactor": 2.153132811325889
+    },
+    {
+      "id": "preemphasis",
+      "condition": "Pre-emphasis",
+      "filters": [
+        "preemphasis"
+      ],
+      "rmsDb": -34.83740930495483,
+      "rmsDbChange": -9.803057041622328,
+      "spectralCentroidHz": 3350.8304561368586,
+      "spectralCentroidChangeHz": 1678.1296265150834,
+      "spectralRolloffHz": 5449.550653594772,
+      "spectralFlatness": 0.13830165565013885,
+      "spectralFlux": 1.1987812519073486,
+      "zcr": 0.36298692018728224,
+      "lowEnergyRatio": 0.00007602435963056167,
+      "speechEnergyRatio": 0.1281192978560448,
+      "highEnergyRatio": 0.8718046777843245,
+      "meanSpeechConfidence": 10.055148769717208,
+      "meanBoundaryConfidence": 0.053260869565217396,
+      "voicedFrameRatio": 0.9184782608695652,
+      "speechLikeRatio": 0.9456521739130435,
+      "processingTimeSec": 8.292328300012741,
+      "speedFactor": 2.213642457929674
+    }
+  ]
+}

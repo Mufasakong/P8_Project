@@ -1,0 +1,333 @@
+﻿\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5}
+}
+
+\title{Stereo-Aware Audio Signal Processing for Speech Activity and Prosody Analysis}
+\author{Mubarik Jamal Muuse}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report presents a stereo-aware audio signal-processing system for analysing speech activity, prosody, and spectral structure in recorded audio clips. The main system is a browser dashboard connected to a Python analysis backend. The dashboard supports clip upload, stereo channel selection, high-pass, low-pass and band-pass filtering, spectral noise suppression, normalization, pre-emphasis, waveform display, STFT-based spectra, mel spectrograms, MFCCs, pitch/F0 estimates, VAD features, stereo diagnostics, exportable filter experiments, and processing-time measurements. The project is evaluated as a signal-processing pipeline. Unity/WebSocket streaming and machine-learning backchannel experiments are treated only as optional extensions and future work.
+\end{abstract}
+
+\section{Introduction}
+Speech and conversational audio are rarely available as clean mono signals. Recordings may contain stereo channels, unequal channel gains, low-frequency handling noise, high-frequency hiss, silence, reverberation, and non-speech events. Before speech activity or prosody can be interpreted, the signal must be represented, filtered, measured, and visualised in a controlled way.
+
+The goal of this project is to build a stereo-aware audio signal-processing dashboard for speech activity and prosody analysis. The central problem is not to predict conversation behaviour directly, but to expose and quantify the intermediate signal-processing steps: channel selection, filtering, spectral representation, energy estimation, pitch/F0 estimation, voice activity detection (VAD), stereo diagnostics, and processing-time measurement. The system is browser-first: the user uploads a clip, selects how the stereo signal should be analysed, chooses preprocessing operations, and exports the resulting measurements. A Unity client can send live PCM frames over WebSocket, but that path is outside the main evaluation.
+
+\section{System Overview}
+The system has two distinct signal paths.
+
+\begin{enumerate}
+    \item \textbf{Playback path.} The browser decodes and plays the selected audio. Filter sliders for high-pass, low-pass and band-pass playback are applied interactively so the user can hear the effect immediately.
+    \item \textbf{Analysis path.} The Python backend loads the selected clip, applies the selected channel mode and preprocessing configuration, then recomputes STFT spectra, mel spectrograms, MFCCs, RMS energy, spectral descriptors, pitch/F0, VAD features, filter experiment metrics, stereo diagnostics, and processing-time measurements.
+\end{enumerate}
+
+This separation matters technically. A playback filter change affects the sound heard in the browser, but it does not change Python-computed plots or exported metrics until the clip is processed again. The report therefore treats exported backend measurements as the authoritative analysis output.
+
+\section{Digital Audio and Stereo Representation}
+\subsection{Sampling}
+A digital audio clip is a sequence of samples $x[n]$ obtained from a continuous pressure waveform at sampling rate $f_s$. If the backend resamples to \SI{16000}{Hz}, the Nyquist frequency is
+\begin{equation}
+    f_N = \frac{f_s}{2} = \SI{8000}{Hz}.
+\end{equation}
+Only frequency components below $f_N$ can be represented without aliasing. A frame of duration $T$ contains
+\begin{equation}
+    N = T f_s
+\end{equation}
+samples, so a \SI{20}{ms} frame at \SI{16000}{Hz} contains $320$ samples. Framing is required because speech is non-stationary: energy, pitch and spectrum change over time.
+
+\subsection{Stereo Channel Modes}
+A mono clip has one signal $x[n]$. A stereo clip has left and right channels, $L[n]$ and $R[n]$. The dashboard supports five analysis modes:
+\begin{align}
+    x_{\mathrm{left}}[n] &= L[n], \\
+    x_{\mathrm{right}}[n] &= R[n], \\
+    x_{\mathrm{mix}}[n] &= \frac{L[n]+R[n]}{2}, \\
+    x_{\mathrm{mid}}[n] &= \frac{L[n]+R[n]}{2}, \\
+    x_{\mathrm{side}}[n] &= \frac{L[n]-R[n]}{2}.
+\end{align}
+The left and right modes preserve individual channels. The mixdown and mid modes estimate the shared centre content. The side mode isolates differences between channels and is useful for diagnosing stereo width, phase differences, or channel-specific noise. Mixdown can reduce noise when channels are coherent, but it can also cancel content if the two channels are out of phase. For this reason, the report treats channel selection as a signal-processing choice rather than a cosmetic option.
+
+Stereo diagnostics are computed before channel reduction. For each channel, RMS energy is measured. The left-right balance is expressed as a dB ratio,
+\begin{equation}
+    B_{\mathrm{LR}} = 20\log_{10}\left(\frac{\mathrm{RMS}(L)+\epsilon}{\mathrm{RMS}(R)+\epsilon}\right),
+\end{equation}
+where positive values indicate higher left-channel level and negative values indicate higher right-channel level. Channel correlation is computed as
+\begin{equation}
+    \rho_{LR} = \frac{\sum_n (L[n]-\bar{L})(R[n]-\bar{R})}{\sqrt{\sum_n (L[n]-\bar{L})^2}\sqrt{\sum_n (R[n]-\bar{R})^2}+\epsilon}.
+\end{equation}
+A correlation close to $1$ suggests dual-mono or highly similar channels, while low or negative correlation suggests wider stereo content or phase mismatch. Mid and side RMS values provide a compact stereo-width diagnostic:
+\begin{equation}
+    W = \frac{\mathrm{RMS}(x_{\mathrm{side}})}{\mathrm{RMS}(x_{\mathrm{mid}})+\epsilon}.
+\end{equation}
+
+\section{Signal-Processing Methods}
+\subsection{Framing, Windowing and STFT}
+The backend analyses short overlapping frames. A window $w[n]$, such as a Hann window, reduces boundary discontinuities before the Fourier transform. With FFT length $N_{\mathrm{FFT}}$ and hop size $H$, the short-time Fourier transform (STFT) is
+\begin{equation}
+    X[m,k] = \sum_{n=0}^{N_{\mathrm{FFT}}-1} x[n+mH]w[n]e^{-j2\pi kn/N_{\mathrm{FFT}}},
+\end{equation}
+where $m$ is the frame index and $k$ is the frequency-bin index. The frequency represented by bin $k$ is
+\begin{equation}
+    f_k = \frac{k f_s}{N_{\mathrm{FFT}}}.
+\end{equation}
+The frequency spacing between adjacent FFT bins is therefore
+\begin{equation}
+    \Delta f = \frac{f_s}{N_{\mathrm{FFT}}}.
+\end{equation}
+Increasing $N_{\mathrm{FFT}}$ improves frequency resolution but widens the analysis window, so rapid speech events become less localised in time. A shorter hop $H$ gives denser time sampling but increases computation. The magnitude $|X[m,k]|$ is used for spectra and spectral features, while the power $|X[m,k]|^2$ is used for energy-based representations.
+
+\subsection{RMS Energy and Decibels}
+Frame energy is represented using root mean square (RMS):
+\begin{equation}
+    \mathrm{RMS}(x) = \sqrt{\frac{1}{N}\sum_{n=0}^{N-1} x[n]^2}.
+\end{equation}
+RMS is converted to decibels using a small constant $\epsilon$ to avoid the logarithm of zero:
+\begin{equation}
+    E_{\mathrm{dB}} = 20\log_{10}(\mathrm{RMS}(x)+\epsilon).
+\end{equation}
+This is not an absolute sound-pressure level measurement; it is a digital full-scale-relative energy measure suitable for comparing frames and filter settings within the same clip.
+
+\subsection{Spectral Features}
+The spectral centroid measures the centre of mass of the magnitude spectrum:
+\begin{equation}
+    C[m] = \frac{\sum_k f_k |X[m,k]|}{\sum_k |X[m,k]|+\epsilon}.
+\end{equation}
+Higher centroid values usually indicate more high-frequency energy.
+
+Spectral rolloff is the frequency below which a chosen fraction $p$ of spectral energy is contained:
+\begin{equation}
+    \sum_{f_k \leq R_p[m]} |X[m,k]|^2 \geq p \sum_k |X[m,k]|^2.
+\end{equation}
+The dashboard can use this to describe whether energy is concentrated in lower or higher parts of the spectrum.
+
+Spectral flatness compares the geometric and arithmetic means of the power spectrum:
+\begin{equation}
+    \mathrm{Flatness}[m] = \frac{\exp\left(\frac{1}{K}\sum_k \log(P[m,k]+\epsilon)\right)}{\frac{1}{K}\sum_k P[m,k]+\epsilon},
+\end{equation}
+where $P[m,k]=|X[m,k]|^2$. Tonal signals have low flatness, while noise-like signals have higher flatness.
+
+Spectral flux measures frame-to-frame spectral change:
+\begin{equation}
+    \mathrm{Flux}[m] = \sqrt{\sum_k \left(\max(0, |X[m,k]|-|X[m-1,k]|)\right)^2}.
+\end{equation}
+It is useful for detecting onsets and changes in speech activity.
+
+Band-energy ratios summarise how much energy falls in low, speech, and high bands. For a frequency band $B$, the ratio is
+\begin{equation}
+    r_B[m] = \frac{\sum_{k: f_k \in B} P[m,k]}{\sum_k P[m,k]+\epsilon}.
+\end{equation}
+These ratios are used in the filter experiment to show how a filter changes the distribution of energy.
+
+Frame-level features are aggregated over a clip before they are exported. Unless a specific export column states otherwise, the intended report interpretation is the arithmetic mean over analysed frames:
+\begin{equation}
+    \bar{q} = \frac{1}{M}\sum_{m=0}^{M-1} q[m].
+\end{equation}
+This matters because a single clip-level number hides temporal variation. Spectrograms and waveforms are therefore used together with tables: the tables summarise average behaviour, while the plots show when the change occurred.
+
+\subsection{Mel Spectrogram and MFCC}
+The mel scale approximates the non-linear frequency resolution of human hearing. A common mapping is
+\begin{equation}
+    \mathrm{mel}(f) = 2595\log_{10}\left(1+\frac{f}{700}\right).
+\end{equation}
+A mel spectrogram is computed by multiplying the STFT power spectrum by a bank of triangular mel filters $M_b[k]$:
+\begin{equation}
+    S_{\mathrm{mel}}[m,b] = \sum_k M_b[k]P[m,k].
+\end{equation}
+The log-mel representation is then
+\begin{equation}
+    L_{\mathrm{mel}}[m,b] = 10\log_{10}(S_{\mathrm{mel}}[m,b]+\epsilon).
+\end{equation}
+Mel-frequency cepstral coefficients (MFCCs) compact this log-mel spectrum using a discrete cosine transform:
+\begin{equation}
+    c_q[m] = \sum_b L_{\mathrm{mel}}[m,b]\cos\left(\frac{\pi q}{B}\left(b+\frac{1}{2}\right)\right).
+\end{equation}
+MFCCs are useful because they describe the broad spectral envelope without retaining every FFT bin.
+
+\subsection{Pitch/F0 and Voicing}
+Pitch analysis estimates the fundamental frequency $F_0$ in voiced regions. In a time-domain pitch estimator, candidate periods $\tau$ can be compared using an autocorrelation-style score,
+\begin{equation}
+    R_m[\tau] = \sum_n x_m[n]x_m[n-\tau],
+\end{equation}
+and the selected period gives
+\begin{equation}
+    F_0[m] = \frac{f_s}{\tau_m}.
+\end{equation}
+Library implementations may use more robust variants, but the interpretation is the same: a voiced frame has a stable periodic structure and an unvoiced frame does not. The system reports pitch-related features such as mean $F_0$, pitch slope, and voiced ratio:
+\begin{equation}
+    r_{\mathrm{voiced}} = \frac{M_{\mathrm{voiced}}}{M}.
+\end{equation}
+These features are only meaningful when the signal contains voiced speech; unvoiced consonants, silence, music, background noise, and strong filtering can produce missing or unstable estimates. The voiced ratio is therefore treated as a confidence-related diagnostic rather than proof of speech content.
+
+\subsection{Voice Activity Detection}
+The VAD uses an adaptive noise-floor concept instead of a fixed global energy threshold. Let $E_{\mathrm{dB}}[m]$ be frame energy and $N_{\mathrm{dB}}[m]$ be a slowly updated estimate of the background floor. A reproducible form of this update is an exponential moving estimate,
+\begin{equation}
+    N_{\mathrm{dB}}[m] = (1-\lambda)N_{\mathrm{dB}}[m-1] + \lambda E_{\mathrm{dB}}[m],
+\end{equation}
+where $\lambda$ controls how quickly the background estimate adapts. In practice, the update should be slow or disabled during detected speech so that speech frames are not absorbed into the noise estimate. An SNR-like activity measure is
+\begin{equation}
+    A[m] = E_{\mathrm{dB}}[m] - N_{\mathrm{dB}}[m].
+\end{equation}
+A frame is speech-like when $A[m]$ exceeds a threshold $\theta_A$ and supporting spectral or voicing features are consistent with speech:
+\begin{equation}
+    v[m] =
+    \begin{cases}
+    1, & A[m] > \theta_A \ \text{and spectral/voicing checks pass},\\
+    0, & \text{otherwise}.
+    \end{cases}
+\end{equation}
+Hangover logic can keep the VAD active for a short time after a detected frame to avoid rapid switching during syllable gaps. No labelled VAD evaluation set is included in the report package, so precision, recall and F1 are not reported.
+
+\section{Preprocessing Filters}
+\subsection{Digital Cutoffs}
+For a digital filter, cutoff frequencies must be interpreted relative to the Nyquist frequency. A cutoff $f_c$ is converted to a normalized angular frequency
+\begin{equation}
+    \omega_c = 2\pi\frac{f_c}{f_s},
+\end{equation}
+or, in libraries that use Nyquist-normalized cutoffs,
+\begin{equation}
+    \Omega_c = \frac{f_c}{f_s/2}.
+\end{equation}
+Valid cutoffs satisfy $0 < f_c < f_s/2$. Band-pass filters require two cutoffs, $f_{\mathrm{low}}$ and $f_{\mathrm{high}}$, with $0 < f_{\mathrm{low}} < f_{\mathrm{high}} < f_s/2$.
+
+\subsection{High-Pass Filter}
+A high-pass filter attenuates frequencies below a cutoff $f_c$. For speech analysis, it is useful for reducing DC offset, microphone handling noise, rumble, and other low-frequency components that can inflate RMS energy or dominate the low-band ratio. The dashboard exposes this filter both for browser playback and backend analysis.
+
+\subsection{Low-Pass Filter}
+A low-pass filter attenuates frequencies above a cutoff $f_c$. It can reduce hiss and high-frequency artefacts, and it can be used to inspect how much of the signal's measured energy lies above the speech-relevant range. The low-pass setting must remain below the Nyquist frequency.
+
+\subsection{Band-Pass Filter}
+A band-pass filter combines low-frequency and high-frequency attenuation. For speech-oriented analysis, a band-pass configuration can focus measurements on a frequency region where speech energy is expected while suppressing rumble and hiss. The chosen passband is a user-controlled analysis parameter, not a universal claim about all speech recordings.
+
+\subsection{Pre-Emphasis}
+Pre-emphasis boosts fast changes and relatively high frequencies using a first-order filter:
+\begin{equation}
+    y[n] = x[n] - \alpha x[n-1],
+\end{equation}
+where $\alpha$ is typically close to $1$. Its transfer function is
+\begin{equation}
+    H(z) = 1 - \alpha z^{-1}.
+\end{equation}
+This can make formant-related spectral structure more visible, but it also raises high-frequency noise. It is therefore evaluated by comparing spectral centroid, high-band ratio, mel spectrograms and flatness before and after processing.
+
+\subsection{RMS Normalization}
+RMS normalization scales a signal toward a target RMS:
+\begin{equation}
+    y[n] = g x[n], \qquad g = \frac{R_{\mathrm{target}}}{\mathrm{RMS}(x)+\epsilon}.
+\end{equation}
+Normalization makes clips easier to compare visually and acoustically, but it does not remove noise. If a quiet clip contains background noise, normalization raises both speech and noise.
+
+\subsection{Spectral Noise Suppression}
+Spectral noise suppression estimates a noise profile and attenuates spectral bins that are close to that floor. In STFT form, a simplified gain can be written as
+\begin{equation}
+    \hat{X}[m,k] = G[m,k]X[m,k], \qquad 0 \leq G[m,k] \leq 1.
+\end{equation}
+The method can improve readability of speech-dominant spectrograms, but aggressive suppression may create artefacts or remove weak speech components. For that reason, the report evaluates it through before/after spectra, mel spectrograms and exported metrics rather than assuming it is always beneficial.
+
+\section{Implementation}
+\subsection{Python Backend}
+The Python backend is responsible for offline analysis of uploaded clips. Its processing sequence is:
+\begin{enumerate}
+    \item load and decode the audio clip;
+    \item preserve stereo information for diagnostics;
+    \item select the analysis channel mode: mixdown, left, right, mid, or side;
+    \item apply the selected analysis preprocessing operations;
+    \item compute waveform samples, STFT spectra, mel spectrograms, MFCCs, RMS, spectral features, pitch/F0 features and VAD features;
+    \item run filter experiments across predefined preprocessing conditions;
+    \item export metrics in CSV/JSON form and report processing time.
+\end{enumerate}
+The implementation uses standard Python audio-analysis tools where appropriate, including librosa-style feature extraction concepts \citep{mcfee2015librosa}. The backend is the source of the report's quantitative measurements. For a result table to be reproducible, the export should include the clip identifier, duration, sample rate, channel count, selected channel mode, frame length, hop length, FFT length, mel-band count, MFCC count, filter cutoffs, pre-emphasis coefficient, normalization target, noise-suppression setting, pitch method, VAD threshold, and hangover setting where these parameters are available.
+
+\subsection{Browser Dashboard}
+The browser dashboard provides the user interface: clip upload, audio playback, channel-mode selection, filter controls, waveform drawing from raw samples, before/after FFT spectrum views, mel spectrogram views, difference spectrogram views, stereo diagnostics, filter experiment tables, and export buttons. It is designed to make preprocessing visible. A user can hear a filter setting in the playback path and then run the backend analysis to produce reproducible metrics for that setting.
+
+\subsection{Exported Experiment Data}
+The filter experiment output is intended to be exportable as CSV/JSON. Each row corresponds to a processing condition, for example raw input, high-pass, low-pass, band-pass, spectral noise suppression, RMS normalization, pre-emphasis, or a selected custom configuration. The columns include RMS dB, spectral centroid, rolloff, flatness, flux, low-band ratio, speech-band ratio, high-band ratio, VAD speech-like ratio, processing time, and speed factor. Numeric results are not inserted in this report unless they are present in exported files. When a column represents a frame-level quantity, the report table should state whether it is the mean, median, maximum, or another aggregate over frames.
+
+\section{Evaluation Design and Available Results}
+\subsection{Evidence Boundary}
+The report package reviewed for this version contains the LaTeX source and bibliography, but no exported CSV/JSON result files and no saved figure files. Therefore, this evaluation section does not invent numeric outcomes. It documents the measurement design and the exact result fields that should be filled from the dashboard export before final submission.
+
+\subsection{Filter Experiment Table}
+Table~\ref{tab:filter-template} gives the report-ready structure for the filter experiment. The same input clip and same analysis channel mode must be used for every row; otherwise the filter comparison is not controlled. Values should be inserted only from exported backend results.
+
+\begin{table}[h]
+\centering
+\caption{Filter experiment table structure. Numeric cells must be filled from exported CSV/JSON results, not estimated manually.}
+\label{tab:filter-template}
+\begin{tabular}{lrrrrrr}
+\toprule
+Condition & RMS dB & Centroid Hz & Low ratio & Speech ratio & High ratio & Time s \\
+\midrule
+Raw & -- & -- & -- & -- & -- & -- \\
+High-pass & -- & -- & -- & -- & -- & -- \\
+Low-pass & -- & -- & -- & -- & -- & -- \\
+Band-pass & -- & -- & -- & -- & -- & -- \\
+Noise suppression & -- & -- & -- & -- & -- & -- \\
+Normalization & -- & -- & -- & -- & -- & -- \\
+Pre-emphasis & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The expected interpretation is signal-processing based. A high-pass filter is primarily inspected through the low-band ratio and the low-frequency part of the spectrum. A low-pass filter is inspected through the high-band ratio and the high-frequency part of the spectrum. A band-pass filter should be interpreted as a redistribution of relative energy into the selected passband, not automatically as an improvement. Pre-emphasis is interpreted through centroid, high-band ratio, flatness and visible high-frequency structure. Normalization should change level-sensitive quantities such as RMS dB while leaving relative spectral ratios mostly unchanged except for numerical and downstream threshold effects. Spectral suppression should reduce bins estimated to be noise, but the result must be checked for removed speech detail or artefacts. The actual result may differ depending on the recording and must be read from exported measurements.
+
+\subsection{Before/After Spectrum and Mel Spectrogram}
+The dashboard supports before/after FFT spectra and before/after mel spectrograms. These plots are used to inspect whether a filter changed the intended frequency region and whether the change is localised or broad. A difference spectrogram can show where energy was removed or amplified over time. No saved spectrum or spectrogram figures are included in the current report package, so no figure-specific claims are made here.
+
+\subsection{Stereo Diagnostics}
+Stereo diagnostics should be reported before reducing the signal to one analysis channel. The required fields are channel count, left RMS, right RMS, left-right balance, channel correlation, mid RMS, side RMS and stereo width. These values determine whether left, right, mixdown, mid or side is the most appropriate analysis mode. For example, a highly correlated recording may be effectively dual mono, while a recording with substantial side energy may produce different analysis results depending on channel mode.
+
+\subsection{Processing Time}
+Processing time is measured for backend analysis, not browser playback. If a clip has duration $D$ seconds and backend analysis takes $T_{\mathrm{proc}}$ seconds, the speed factor is
+\begin{equation}
+    S = \frac{D}{T_{\mathrm{proc}}+\epsilon}.
+\end{equation}
+The equivalent real-time factor is
+\begin{equation}
+    \mathrm{RTF} = \frac{T_{\mathrm{proc}}}{D+\epsilon}.
+\end{equation}
+A speed factor greater than $1$ or an RTF below $1$ means the analysis ran faster than real time. A speed factor below $1$ or an RTF above $1$ means it was slower than real time. The report should include these values for each exported filter condition because some operations, especially spectral suppression and pitch analysis, are more expensive than simple filtering.
+
+\section{Discussion}
+The implementation is structured around measurable signal processing. Its strongest part is the explicit connection between channel mode, preprocessing, spectral representation, speech/prosody features, visual diagnostics and exportable measurements. The dashboard is designed so that filters can be heard interactively and then recomputed by the backend for a controlled analysis condition.
+
+The main limitation is the evidence boundary. Without exported CSV/JSON files or saved figures in the report package, the report cannot claim that a particular filter improved a particular recording. It can only describe the implemented measurements and how the exported data should be interpreted. A final submission should include at least one exported filter table, one before/after spectrum, one before/after mel spectrogram, one stereo diagnostic output and one processing-time table.
+
+There are also signal-processing limitations. Stereo mixdown can hide channel-specific problems or cause cancellation when channels are out of phase. Pitch/F0 is unreliable in unvoiced, noisy or non-speech frames. VAD based on adaptive energy and SNR-like thresholds depends on the noise-floor estimate and has not been validated here against labelled speech/non-speech annotations. Browser playback filtering and Python analysis filtering are separate paths, so the user must reprocess the clip before treating plots and exported metrics as updated.
+
+\section{Conclusion}
+This project implements a stereo-aware audio signal-processing dashboard for speech activity and prosody analysis. The main contribution is a structured analysis pipeline covering stereo channel modes, high-pass/low-pass/band-pass filtering, pre-emphasis, RMS normalization, spectral noise suppression, STFT spectra, mel spectrograms, MFCCs, RMS energy, spectral centroid, rolloff, flatness, flux, pitch/F0 features, adaptive VAD features, stereo diagnostics, and processing-time measurements. The current report avoids unsupported numeric results; final quantitative claims should be added only from exported backend data.
+
+\appendix
+\section{Optional Unity/WebSocket Support}
+Unity support is an optional extension. In that mode, a Unity client can send live PCM audio frames to a WebSocket server and receive feature JSON in return. This is useful for interactive demonstrations, but it is not the main contribution of this report and is not used as the basis for the filter evaluation.
+
+\section{Machine Learning and Backchannel Future Work}
+Earlier machine-learning and backchannel experiments are outside the main report. They should be treated as future work that could consume the exported signal-processing features after a labelled dataset and evaluation protocol have been established. The present project does not claim reliable backchannel prediction.
+
+\section{Additional Reporting Fields}
+Additional implementation details can be reported with the exported results rather than in the main text. Useful fields are clip name, duration, original sample rate, analysis sample rate, channel count, selected channel mode, filter cutoffs, FFT length, hop length, mel-band count, MFCC count, pitch/F0 method, VAD threshold, hangover setting, normalization target, and noise-suppression setting. These fields make the quantitative tables reproducible without shifting the main report away from signal processing.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

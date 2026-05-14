@@ -22,7 +22,7 @@
         </div>
         <div>
           <h1>Prosody Monitor</h1>
-          <p>Live and clip analysis with timeline focus, spectrograms, and explanations.</p>
+          <p>Stereo-aware clip and live analysis with waveform, spectra, spectrograms, and explanations.</p>
         </div>
       </div>
       <div class="top-actions">
@@ -38,37 +38,47 @@
         <div class="card controls view-toggle">
           <h3>Analyze audio clip</h3>
           <input type="file" id="audioFile" accept=".wav,.mp3,.m4a,.ogg,.flac"/>
-          <div class="small" style="margin-top:8px;">Filters (clip only)</div>
+          <div class="small" style="margin-top:8px;">Analysis channel</div>
+          <select id="channelModeSelect" class="channel-select">
+            <option value="mixdown" selected>Mixdown (L+R)/2</option>
+            <option value="left">Left channel</option>
+            <option value="right">Right channel</option>
+            <option value="mid">Mid (L+R)/2</option>
+            <option value="side">Side (L-R)/2</option>
+          </select>
+          <div class="small">The selected channel is used for analysis. Stereo playback is preserved when possible.</div>
+          <div class="small" style="margin-top:8px;">Signal-processing filters</div>
           <div class="signal-list filter-list" id="filterList">
-            <label><input type="checkbox" data-filter="noise"/>Noise suppression</label>
-            <label><input type="checkbox" data-filter="highpass"/>High-pass (80 Hz)</label>
-            <label><input type="checkbox" data-filter="lowpass"/>Low-pass (4 kHz)</label>
-            <label><input type="checkbox" data-filter="bandpass"/>Band-pass (80-4000 Hz)</label>
-            <label><input type="checkbox" data-filter="normalize"/>Normalize RMS</label>
-            <label><input type="checkbox" data-filter="preemphasis"/>Pre-emphasis</label>
-            <label><input type="checkbox" data-filter="distortion"/>Drive / distortion</label>
-            <label><input type="checkbox" data-filter="tremolo"/>Tremolo (volume mod)</label>
-            <label><input type="checkbox" data-filter="sawtooth"/>Sawtooth mod</label>
-            <label><input type="checkbox" data-filter="ringmod"/>Ring mod</label>
-            <label><input type="checkbox" data-filter="bitcrush"/>Bitcrush</label>
-            <label><input type="checkbox" data-filter="echo"/>Echo</label>
+            <div class="filter-section-title">Analysis + instant playback</div>
+            <label><input type="checkbox" data-filter="noise" data-analysis-filter="1"/>Noise suppression</label>
+            <label><input type="checkbox" data-filter="highpass" data-analysis-filter="1" data-playback-filter="1"/>High-pass (80 Hz)</label>
+            <label><input type="checkbox" data-filter="lowpass" data-analysis-filter="1" data-playback-filter="1"/>Low-pass (4 kHz)</label>
+            <label><input type="checkbox" data-filter="bandpass" data-analysis-filter="1" data-playback-filter="1"/>Band-pass (80-4000 Hz)</label>
+            <label><input type="checkbox" data-filter="normalize" data-analysis-filter="1"/>Normalize RMS</label>
+            <label><input type="checkbox" data-filter="preemphasis" data-analysis-filter="1"/>Pre-emphasis</label>
+            <div class="filter-section-title">Playback demo only</div>
+            <label><input type="checkbox" data-filter="echo" data-playback-filter="1"/>Echo</label>
           </div>
-          <div class="btnrow">
-            <button id="uploadBtn" class="btn btn-primary">Process clip</button>
-          </div>
-          <audio id="player" controls></audio>
-          <div class="small" id="uploadStatus">No file uploaded.</div>
-          <div class="segment-badge" id="currentSegment">
-            <span class="segment-label">Current segment</span>
-            <span class="segment-arrows" aria-hidden="true">⇄</span>
-            <span class="segment-value">none</span>
-          </div>
-          <div class="summary" id="clipSummary"></div>
-          <div class="small" style="margin-top:8px;">Boundaries</div>
-          <div class="boundary-list" id="boundaryList"></div>
+          <details class="mini-advanced" open>
+            <summary>Filter parameters and noise experiment</summary>
+            <div class="slider-stack">
+              <label class="slider-row">High-pass cutoff <span id="highpassValue">80 Hz</span><input id="highpassHz" type="range" min="20" max="1000" step="5" value="80"/></label>
+              <label class="slider-row">Low-pass cutoff <span id="lowpassValue">4000 Hz</span><input id="lowpassHz" type="range" min="500" max="7900" step="50" value="4000"/></label>
+              <label class="slider-row">Band-pass low <span id="bandLowValue">80 Hz</span><input id="bandLowHz" type="range" min="20" max="1000" step="5" value="80"/></label>
+              <label class="slider-row">Band-pass high <span id="bandHighValue">4000 Hz</span><input id="bandHighHz" type="range" min="1000" max="7900" step="50" value="4000"/></label>
+              <label class="slider-row">Echo delay <span id="echoDelayValue">220 ms</span><input id="echoDelayMs" type="range" min="60" max="800" step="10" value="220"/></label>
+              <label class="slider-row">Echo feedback <span id="echoFeedbackValue">0.35</span><input id="echoFeedback" type="range" min="0" max="0.85" step="0.01" value="0.35"/></label>
+              <label class="small checkbox-line"><input type="checkbox" id="noiseExperimentEnabled"/> Add synthetic noise before filtering</label>
+              <label class="slider-row">Noise SNR <span id="noiseSnrValue">10 dB</span><input id="noiseSnrDb" type="range" min="0" max="30" step="1" value="10"/></label>
+            </div>
+          </details>
+          <div class="small">High-pass, low-pass, band-pass and echo update during playback. Noise suppression, normalization, pre-emphasis and synthetic noise are applied when you press Process clip in the Clip view.</div>
         </div>
 
-        <div class="card controls">
+        <details class="accordion-card advanced-controls">
+          <summary>Advanced controls: mic, baseline, window and mode</summary>
+          <div class="accordion-inner">
+            <div class="subcard controls">
           <h3>Baseline calibration</h3>
           <div class="btnrow">
             <button id="baselineCalibrateBtn" class="btn btn-secondary">Calibrate from clip</button>
@@ -80,7 +90,7 @@
           <div class="small" id="baselineStatus">No baseline captured.</div>
         </div>
 
-        <div class="card controls">
+            <div class="subcard controls">
           <h3>Mic mode</h3>
           <div class="btnrow">
             <button id="micStartBtn" class="btn btn-primary">Start mic stream</button>
@@ -107,7 +117,7 @@
           </div>
         </div>
 
-        <div class="card controls">
+            <div class="subcard controls">
           <h3>Window</h3>
           <div class="btnrow">
             <label for="windowSizeSelect" class="small">Window size</label>
@@ -123,7 +133,7 @@
           </div>
         </div>
 
-        <div class="card controls">
+            <div class="subcard controls">
           <h3>Mode</h3>
           <div class="btnrow">
             <button id="liveModeBtn" class="btn btn-secondary">Switch to live mode</button>
@@ -132,11 +142,21 @@
             In clip mode, each graph shows a full overview plus a highlighted time window.
           </div>
         </div>
+          </div>
+        </details>
+
       </aside>
 
       <section class="analysis">
-        <div class="card controls view-toggle">
+        <div class="card controls view-toggle clip-control-card">
           <h3>Clip view</h3>
+          <div class="clip-action-bar">
+            <button id="uploadBtn" class="btn btn-primary">Process clip</button>
+            <button id="exportJsonBtn" class="btn btn-secondary" type="button">Export JSON</button>
+            <button id="exportCsvBtn" class="btn btn-secondary" type="button">Export features CSV</button>
+          </div>
+          <audio id="player" controls></audio>
+          <div class="small" id="uploadStatus">No file uploaded.</div>
           <div class="btnrow">
             <button id="viewProcessedBtn" class="btn btn-primary">Processed view</button>
             <button id="viewOriginalBtn" class="btn btn-secondary">Original view</button>
@@ -145,6 +165,17 @@
             </label>
           </div>
           <div class="small">Switch between original/processed or overlay them in the graphs.</div>
+          <details class="compact-details clip-runtime-details">
+            <summary>Current segment, summary and boundaries</summary>
+            <div class="segment-badge" id="currentSegment">
+              <span class="segment-label">Current segment</span>
+              <span class="segment-arrows" aria-hidden="true">⇄</span>
+              <span class="segment-value">none</span>
+            </div>
+            <div class="summary" id="clipSummary"></div>
+            <div class="small" style="margin-top:8px;">Boundaries</div>
+            <div class="boundary-list" id="boundaryList"></div>
+          </details>
         </div>
 
         <div class="panel-grid">
@@ -161,14 +192,105 @@
             <h3>Live spectrogram (mel)</h3>
             <div class="small">Live mel frames from websocket.</div>
             <canvas id="liveSpectrogram" width="320" height="120"></canvas>
-            <div class="small" style="margin-top:10px;">Waveform (live window)</div>
-            <canvas id="clipWaveform" class="waveform-canvas" width="320" height="80"></canvas>
+            <div class="waveform-head">
+              <div>
+                <div class="small" style="margin-top:10px;">Waveform (sample view)</div>
+                <div class="small">Drawn from decoded audio samples, not RMS feature frames.</div>
+              </div>
+              <label class="small waveform-mode-label">
+                View
+                <select id="waveformModeSelect" class="waveform-mode-select">
+                  <option value="analysis" selected>Analysis channel</option>
+                  <option value="mixdown">Mixdown</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                  <option value="overlay">Overlay L/R</option>
+                </select>
+              </label>
+            </div>
+            <canvas id="clipWaveform" class="waveform-canvas" width="320" height="90"></canvas>
           </div>
         </div>
 
+        <div class="card spectrum-card">
+          <h3>Filter comparison: spectrum before / after</h3>
+          <div class="small" id="spectrumMeta">FFT magnitude spectrum of the selected analysis channel. This shows what the selected filters remove or preserve.</div>
+          <div class="spectrum-grid">
+            <div>
+              <div class="small">Original</div>
+              <canvas id="spectrumOriginal" class="spectrum-canvas" width="420" height="150"></canvas>
+            </div>
+            <div>
+              <div class="small">Processed</div>
+              <canvas id="spectrumProcessed" class="spectrum-canvas" width="420" height="150"></canvas>
+            </div>
+            <div>
+              <div class="small">Theoretical filter response</div>
+              <canvas id="filterResponseCanvas" class="spectrum-canvas" width="420" height="150"></canvas>
+              <div class="small" id="filterResponseNotes"></div>
+            </div>
+          </div>
+        </div>
+
+        <details class="card analysis-card collapsible-card">
+          <summary>Before / after numerical measurements</summary>
+          <div class="collapsible-content">
+            <div class="small">Quantifies how the selected filters changed the selected analysis channel.</div>
+            <div class="metric-table-wrap"><table class="metric-table" id="metricComparisonTable"></table></div>
+          </div>
+        </details>
+        <details class="card analysis-card collapsible-card" open>
+          <summary>Report-ready filter experiment</summary>
+          <div class="collapsible-content">
+            <div class="small">
+              Automatically runs the same clip through raw, high-pass, low-pass, band-pass, noise suppression,
+              normalization, and pre-emphasis conditions. Use this table directly for the report.
+            </div>
+            <div class="btnrow">
+              <button id="runFilterExperimentBtn" class="btn btn-primary" type="button">Run filter experiment</button>
+              <button id="exportExperimentCsvBtn" class="btn btn-secondary" type="button">Export experiment CSV</button>
+              <button id="exportExperimentJsonBtn" class="btn btn-secondary" type="button">Export experiment JSON</button>
+            </div>
+            <div class="small" id="filterExperimentStatus">No experiment run yet.</div>
+            <div class="metric-table-wrap"><table class="metric-table experiment-table" id="filterExperimentTable"></table></div>
+          </div>
+        </details>
+
+        <div class="card spectro-card">
+          <h3>Spectrogram difference</h3>
+          <div class="small">Processed mel spectrogram minus original mel spectrogram. Bright areas show preserved or boosted energy; dark areas show removed energy.</div>
+          <canvas id="diffSpectrogram" class="diff-spectrogram" width="640" height="160"></canvas>
+        </div>
+
+        <details class="card spectrum-card collapsible-card">
+          <summary>Stereo channel comparison</summary>
+          <div class="collapsible-content">
+            <div class="small">Spectra for left, right, mid and side channels. This shows whether stereo contains meaningful channel differences.</div>
+            <div class="spectrum-grid channel-spectrum-grid">
+              <div><div class="small">Left</div><canvas id="channelSpectrumLeft" class="spectrum-canvas" width="300" height="120"></canvas></div>
+              <div><div class="small">Right</div><canvas id="channelSpectrumRight" class="spectrum-canvas" width="300" height="120"></canvas></div>
+              <div><div class="small">Mid</div><canvas id="channelSpectrumMid" class="spectrum-canvas" width="300" height="120"></canvas></div>
+              <div><div class="small">Side</div><canvas id="channelSpectrumSide" class="spectrum-canvas" width="300" height="120"></canvas></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="card method-card">
+          <summary>Method notes: what the signal-processing blocks mean</summary>
+          <div class="method-grid">
+            <div><strong>RMS</strong><p>Energy estimate: square, average, then square-root.</p></div>
+            <div><strong>STFT</strong><p>Windowed Fourier transform used to analyse time-varying spectra.</p></div>
+            <div><strong>Mel / MFCC</strong><p>Mel bands approximate perceptual frequency spacing; MFCCs compactly describe the log-mel shape.</p></div>
+            <div><strong>Mid / Side</strong><p>Mid=(L+R)/2, Side=(L-R)/2. Side energy measures stereo difference.</p></div>
+            <div><strong>Filters</strong><p>High-pass, low-pass and band-pass filters shape the spectrum; the response panel shows |H(f)|.</p></div>
+            <div><strong>Noise experiment</strong><p>Synthetic noise is mixed at a target SNR before filtering to test robustness.</p></div>
+          </div>
+        </details>
+
         <div class="graphs-grid">
-          <div class="card graph-card">
-            <h3>Graph A - energy and voicing</h3>
+          <details class="card graph-card collapsible-card" open>
+            <summary>Graph A - energy and voicing</summary>
+            <div class="collapsible-content">
             <p class="graph-desc">Use this view to track loudness, SNR, and voicing changes.</p>
             <div class="graph-toolbar">
               <button data-graph="g1" class="btn btn-chip allOnBtn">All on</button>
@@ -183,10 +305,12 @@
               <canvas id="detail_g1"></canvas>
             </div>
             <div class="chart-legend" id="legend_g1"></div>
-          </div>
+            </div>
+          </details>
 
-          <div class="card graph-card">
-            <h3>Graph B - spectral and confidence</h3>
+          <details class="card graph-card collapsible-card">
+            <summary>Graph B - spectral and confidence</summary>
+            <div class="collapsible-content">
             <p class="graph-desc">Spectral shape, speech confidence, and boundary signals.</p>
             <div class="graph-toolbar">
               <button data-graph="g2" class="btn btn-chip allOnBtn">All on</button>
@@ -201,13 +325,35 @@
               <canvas id="detail_g2"></canvas>
             </div>
             <div class="chart-legend" id="legend_g2"></div>
-          </div>
+            </div>
+          </details>
         </div>
 
       </section>
 
       <aside class="insights">
-        <div class="card heatmap-card heatmap-vertical">
+        <details class="accordion-card diagnostics-controls">
+          <summary>Diagnostics: heatmap, guide and latest values</summary>
+          <div class="accordion-inner">
+
+            <div class="subcard stereo-card">
+          <h3>Stereo diagnostics</h3>
+          <div class="small">Shows whether the uploaded clip is true stereo, dual-mono, or effectively mono.</div>
+          <div class="kv-grid compact-kv" id="stereoDiagnosticsGrid">
+            <div class="kv"><span class="k">Detected channels</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Analysis channel</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Left RMS dB</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Right RMS dB</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Balance L-R</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">L/R correlation</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Mid RMS dB</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Side RMS dB</span><span class="v">-</span></div>
+            <div class="kv"><span class="k">Stereo width</span><span class="v">-</span></div>
+          </div>
+          <div class="small stereo-hint" id="stereoDiagnosticsHint">Upload and process a clip to inspect stereo information.</div>
+        </div>
+
+            <div class="subcard heatmap-card heatmap-vertical">
           <h3>Prosody heatmap</h3>
           <canvas id="prosodyHeatmap" class="heatmap-canvas" width="320" height="220"></canvas>
           <div class="heatmap-legend">
@@ -216,7 +362,7 @@
             <span><span class="heatmap-dot dot-boundary"></span>Boundary confidence</span>
           </div>
         </div>
-        <div class="card info-card">
+            <div class="subcard info-card">
           <h3>Interpretation quick guide</h3>
           <div class="info-grid">
             <div>
@@ -235,7 +381,7 @@
           <div class="small" style="margin-top:8px;">Open the full legend for deeper explanations.</div>
         </div>
 
-        <div class="card">
+            <div class="subcard">
           <h3>Latest values</h3>
           <div class="kv-grid" id="kvGrid"></div>
           <div class="small" style="margin-top:8px;">
@@ -243,6 +389,8 @@
           </div>
         </div>
 
+          </div>
+        </details>
       </aside>
     </div>
   </div>

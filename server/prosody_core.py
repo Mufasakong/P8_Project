@@ -6,8 +6,18 @@ from typing import Any
 
 import librosa
 import numpy as np
-import pyworld as pw
 
+try:
+    import pyworld as pw
+    HAS_PYWORLD = True
+except Exception:  # pragma: no cover
+    pw = None
+    HAS_PYWORLD = False
+
+
+# ==========================================
+# Core configuration
+# ==========================================
 
 DEFAULT_SR = 16000
 DEFAULT_FRAME_MS = 20
@@ -38,6 +48,8 @@ DEFAULT_MEL_FMIN = 50.0
 DEFAULT_MEL_FMAX = None
 DEFAULT_EMIT_MEL_FRAME = True
 DEFAULT_MEL_MAX_FRAMES = 700
+
+DEFAULT_CHANNEL_NAMES = ("L", "R")
 
 
 @dataclass
@@ -77,7 +89,7 @@ class ProsodyConfig:
         return self.sr * self.frame_ms // 1000
 
     @property
-    def frame_bytes(self) -> int:
+    def frame_bytes_mono(self) -> int:
         return self.frame_samples * 2
 
     @property
@@ -107,6 +119,71 @@ class ProsodyState:
     low_ratio_sm: float | None = None
 
     speech_rmsdb_hist: deque[float] = field(default_factory=lambda: deque(maxlen=400))
+
+
+# ==========================================
+# Utility functions
+# ==========================================
+
+def as_channels_first(y: np.ndarray) -> np.ndarray:
+    """
+    Return audio as float32 with shape (channels, samples).
+
+    Accepted input shapes:
+    - (samples,)
+    - (channels, samples), as returned by librosa.load(..., mono=False)
+    - (samples, channels), as commonly returned by soundfile
+    """
+    arr = np.asarray(y, dtype=np.float32)
+
+    if arr.ndim == 0:
+        return arr.reshape(1, 1)
+
+    if arr.ndim == 1:
+        return arr.reshape(1, -1)
+
+    if arr.ndim != 2:
+        raise ValueError(f"Expected 1D or 2D audio, got shape {arr.shape}")
+
+    # Heuristic: the channel dimension is normally small.
+    if arr.shape[0] <= 16 and arr.shape[1] > arr.shape[0]:
+        out = arr
+    elif arr.shape[1] <= 16 and arr.shape[0] > arr.shape[1]:
+        out = arr.T
+    else:
+        # Ambiguous, but librosa uses channels-first for multi-channel.
+        out = arr
+
+    return np.clip(out.astype(np.float32), -1.0, 1.0)
+
+
+def mixdown_audio(y: np.ndarray) -> np.ndarray:
+    """Convert mono/stereo/multichannel audio to one mono waveform by averaging channels."""
+    ch = as_channels_first(y)
+    if ch.shape[0] == 1:
+        return ch[0].astype(np.float32)
+    return np.mean(ch, axis=0).astype(np.float32)
+
+
+def channel_names(n_channels: int, names: list[str] | tuple[str, ...] | None = None) -> list[str]:
+    if names is not None and len(names) >= n_channels:
+        return list(names[:n_channels])
+    if n_channels == 1:
+        return ["mono"]
+    if n_channels == 2:
+        return ["left", "right"]
+    return [f"ch{i}" for i in range(n_channels)]
+
+
+def rms_float(y: np.ndarray) -> float:
+    y = np.asarray(y, dtype=np.float32)
+    if y.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(y * y) + 1e-12))
+
+
+def rms_db(y: np.ndarray) -> float:
+    return float(20.0 * np.log10(rms_float(y) + 1e-9))
 
 
 def rms_from_int16(x: np.ndarray) -> float:
@@ -139,8 +216,36 @@ def slope_from_last(values: list[float] | np.ndarray, hz: float) -> float:
     return float(m * float(hz))
 
 
+# ==========================================
+# Audio I/O
+# ==========================================
+
+def load_audio_channels_16k(path: str, sr: int = DEFAULT_SR) -> np.ndarray:
+    """
+    Load audio as channels-first float32, preserving stereo/multichannel when present.
+
+    Output shape: (channels, samples).
+    """
+    y, _ = librosa.load(path, sr=sr, mono=False)
+    return as_channels_first(y)
+
+
+def load_audio_mono_16k(path: str, sr: int = DEFAULT_SR) -> np.ndarray:
+    """Load any audio file and return a single mono waveform."""
+    y = load_audio_channels_16k(path, sr=sr)
+    return mixdown_audio(y)
+
+
+def float_audio_to_int16(y: np.ndarray) -> np.ndarray:
+    return np.clip(np.asarray(y) * 32768.0, -32768, 32767).astype(np.int16)
+
+
+# ==========================================
+# Feature extraction
+# ==========================================
+
 def pitch_features_from_buffer(x_int16: np.ndarray, sr: int) -> tuple[float, float, float]:
-    if x_int16.size < int(sr * 0.2):
+    if (not HAS_PYWORLD) or x_int16.size < int(sr * 0.2):
         return 0.0, 0.0, 0.0
 
     x = (x_int16.astype(np.float64) / 32768.0).copy()
@@ -183,6 +288,10 @@ def compute_mel_spectrogram(
     fmin: float,
     fmax: float | None,
 ) -> np.ndarray:
+    y = np.asarray(y, dtype=np.float32)
+    if y.size < win:
+        return np.zeros((n_mels, 0), dtype=np.float32)
+
     fmax_use = float(fmax) if fmax is not None else float(sr / 2)
     power = (
         np.abs(
@@ -205,7 +314,7 @@ def compute_mel_spectrogram(
         fmax=fmax_use,
     )
     mel_db = librosa.power_to_db(mel, ref=1.0, top_db=80.0)
-    return mel_db
+    return mel_db.astype(np.float32)
 
 
 def downsample_spectrogram(mel_db: np.ndarray, max_frames: int) -> tuple[np.ndarray, np.ndarray]:
@@ -234,8 +343,10 @@ def compute_dsp_features(
     mel_fmax: float | None = DEFAULT_MEL_FMAX,
     emit_mel_frame: bool = DEFAULT_EMIT_MEL_FRAME,
 ) -> dict[str, float]:
+    y = np.asarray(y, dtype=np.float32)
+
     if y is None or y.size < win:
-        base = {
+        base: dict[str, Any] = {
             "rmsDb": 0.0,
             "zcr": 0.0,
             "specCentroid": 0.0,
@@ -256,7 +367,7 @@ def compute_dsp_features(
         return base
 
     rms = float(np.sqrt(np.mean(y * y) + 1e-12))
-    rms_db = float(20.0 * np.log10(rms + 1e-9))
+    rms_db_value = float(20.0 * np.log10(rms + 1e-9))
 
     zcr = float(
         librosa.feature.zero_crossing_rate(
@@ -318,8 +429,8 @@ def compute_dsp_features(
     else:
         mfcc_delta0 = 0.0
 
-    out = {
-        "rmsDb": rms_db,
+    out: dict[str, Any] = {
+        "rmsDb": rms_db_value,
         "zcr": zcr,
         "specCentroid": centroid,
         "specRolloff": rolloff,
@@ -353,6 +464,74 @@ def compute_dsp_features(
 
     return out
 
+
+def compute_stereo_features(y: np.ndarray, sr: int = DEFAULT_SR) -> dict[str, Any]:
+    """
+    Compute simple stereo/multichannel descriptors.
+
+    For stereo, these describe balance, inter-channel correlation, and mid/side energy.
+    For more than two channels, they report per-channel energy and average correlation.
+    """
+    ch = as_channels_first(y)
+    n_channels = ch.shape[0]
+    names = channel_names(n_channels)
+
+    per_channel_rms = [rms_float(ch[i]) for i in range(n_channels)]
+    per_channel_rms_db = [float(20.0 * np.log10(v + 1e-9)) for v in per_channel_rms]
+
+    out: dict[str, Any] = {
+        "channelCount": int(n_channels),
+        "channelNames": names,
+        "channelRms": per_channel_rms,
+        "channelRmsDb": per_channel_rms_db,
+    }
+
+    if n_channels >= 2:
+        left = ch[0]
+        right = ch[1]
+        n = min(left.size, right.size)
+        left = left[:n]
+        right = right[:n]
+
+        if n > 1 and np.std(left) > 1e-9 and np.std(right) > 1e-9:
+            corr = float(np.corrcoef(left, right)[0, 1])
+        else:
+            corr = 0.0
+
+        mid = 0.5 * (left + right)
+        side = 0.5 * (left - right)
+        mid_rms = rms_float(mid)
+        side_rms = rms_float(side)
+
+        out.update({
+            "leftRmsDb": per_channel_rms_db[0],
+            "rightRmsDb": per_channel_rms_db[1],
+            "balanceDbLeftMinusRight": float(per_channel_rms_db[0] - per_channel_rms_db[1]),
+            "leftRightCorrelation": corr,
+            "midRmsDb": float(20.0 * np.log10(mid_rms + 1e-9)),
+            "sideRmsDb": float(20.0 * np.log10(side_rms + 1e-9)),
+            "stereoWidth": float(side_rms / (mid_rms + side_rms + 1e-9)),
+        })
+
+    if n_channels > 2:
+        corrs = []
+        for i in range(n_channels):
+            for j in range(i + 1, n_channels):
+                a = ch[i]
+                b = ch[j]
+                n = min(a.size, b.size)
+                a = a[:n]
+                b = b[:n]
+                if n > 1 and np.std(a) > 1e-9 and np.std(b) > 1e-9:
+                    corrs.append(float(np.corrcoef(a, b)[0, 1]))
+        out["meanInterchannelCorrelation"] = float(np.mean(corrs)) if corrs else 0.0
+
+    return out
+
+
+# ==========================================
+# VAD and interaction-oriented acoustic scores
+# ==========================================
 
 def speech_confidence(
     snr_like: float,
@@ -414,6 +593,8 @@ def update_prosody_frame(
     *,
     config: ProsodyConfig,
 ) -> tuple[int, int, dict[str, Any] | None]:
+    """Update one mono int16 frame and emit one feature dictionary."""
+    frame_int16 = np.asarray(frame_int16, dtype=np.int16).reshape(-1)
     rms_frame = rms_from_int16(frame_int16)
 
     n = frame_int16.size
@@ -509,12 +690,10 @@ def update_prosody_frame(
         voiced_ratio=voiced_ratio,
     )
 
-    # turn-taking / question / engagement heuristics
     pause_norm = norm_range(pause_ms, 200.0, 900.0)
     speech_norm = norm_range(speech_ms, 400.0, 2500.0)
     energy_fall = norm_range(-speech_energy_slope, 0.3, 1.5)
     f0_fall = norm_range(-f0_slope, 5.0, 50.0)
-    voiced_norm = norm_range(voiced_ratio, 0.15, 0.6)
     question_like = clamp01(norm_range(f0_slope, 5.0, 60.0) * 0.6 + norm_range(pause_ms, 120.0, 450.0) * 0.4)
 
     turn_end_score = clamp01(
@@ -559,16 +738,9 @@ def update_prosody_frame(
     return ring_write, ring_filled, out
 
 
-def load_audio_mono_16k(path: str, sr: int = DEFAULT_SR) -> np.ndarray:
-    y, _ = librosa.load(path, sr=sr, mono=True)
-    y = np.asarray(y, dtype=np.float32)
-    y = np.clip(y, -1.0, 1.0)
-    return y
-
-
-def float_audio_to_int16(y: np.ndarray) -> np.ndarray:
-    return np.clip(y * 32768.0, -32768, 32767).astype(np.int16)
-
+# ==========================================
+# Timeline summaries and segmentation
+# ==========================================
 
 def summarize_feature_timeline(features: list[dict[str, Any]]) -> dict[str, float]:
     if not features:
@@ -665,26 +837,17 @@ def build_segments(features: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
     return segments, boundaries
 
 
-def analyze_audio_file(
-    path: str,
-    *,
-    config: ProsodyConfig | None = None,
-    include_features: bool = True,
-) -> dict[str, Any]:
-    config = config or ProsodyConfig()
+# ==========================================
+# Clip analysis entry points
+# ==========================================
 
-    y = load_audio_mono_16k(path, sr=config.sr)
-    return analyze_audio_array(y, config=config, include_features=include_features)
-
-
-def analyze_audio_array(
+def _analyze_mono_audio_array(
     y: np.ndarray,
     *,
-    config: ProsodyConfig | None = None,
+    config: ProsodyConfig,
     include_features: bool = True,
 ) -> dict[str, Any]:
-    config = config or ProsodyConfig()
-    y = np.asarray(y, dtype=np.float32)
+    y = np.asarray(y, dtype=np.float32).reshape(-1)
     y = np.clip(y, -1.0, 1.0)
 
     x_int16 = float_audio_to_int16(y)
@@ -723,7 +886,7 @@ def analyze_audio_array(
 
     segments, boundaries = build_segments(features)
 
-    result = {
+    result: dict[str, Any] = {
         "type": "clip_analysis",
         "summary": summarize_feature_timeline(features),
         "segments": segments,
@@ -734,3 +897,66 @@ def analyze_audio_array(
         result["features"] = features
 
     return result
+
+
+def analyze_audio_file(
+    path: str,
+    *,
+    config: ProsodyConfig | None = None,
+    include_features: bool = True,
+    preserve_channels: bool = True,
+) -> dict[str, Any]:
+    config = config or ProsodyConfig()
+    y = load_audio_channels_16k(path, sr=config.sr) if preserve_channels else load_audio_mono_16k(path, sr=config.sr)
+    return analyze_audio_array(y, config=config, include_features=include_features)
+
+
+def analyze_audio_array(
+    y: np.ndarray,
+    *,
+    config: ProsodyConfig | None = None,
+    include_features: bool = True,
+    names: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """
+    Analyze mono, stereo, or multichannel audio.
+
+    Backward-compatible behavior:
+    - For mono, returns the same top-level fields as the original version.
+    - For stereo/multichannel, top-level fields describe the mixdown, and a
+      `channels` list contains per-channel analyses.
+    """
+    config = config or ProsodyConfig()
+    ch = as_channels_first(y)
+    n_channels = int(ch.shape[0])
+    names_use = channel_names(n_channels, names)
+
+    if n_channels == 1:
+        result = _analyze_mono_audio_array(ch[0], config=config, include_features=include_features)
+        result["analysisMode"] = "mono"
+        result["channelCount"] = 1
+        result["channelNames"] = names_use
+        return result
+
+    mix = mixdown_audio(ch)
+    mix_result = _analyze_mono_audio_array(mix, config=config, include_features=include_features)
+    mix_result["type"] = "clip_analysis_multichannel"
+    mix_result["analysisMode"] = "mixdown"
+    mix_result["channelCount"] = n_channels
+    mix_result["channelNames"] = names_use
+    mix_result["stereo"] = compute_stereo_features(ch, sr=config.sr)
+
+    channel_results = []
+    for i in range(n_channels):
+        r = _analyze_mono_audio_array(ch[i], config=config, include_features=include_features)
+        channel_results.append({
+            "index": i,
+            "name": names_use[i],
+            "summary": r.get("summary", {}),
+            "segments": r.get("segments", []),
+            "boundaries": r.get("boundaries", []),
+            "features": r.get("features", []) if include_features else [],
+        })
+
+    mix_result["channels"] = channel_results
+    return mix_result

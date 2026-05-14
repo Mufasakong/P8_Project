@@ -288,13 +288,28 @@ type BcState = {
   lastGlobalTs: number;
   lastPerNpcTs: Record<NpcKey, number>;
   lastPerActionTs: Record<BcAction, number>;
+
+  // Event-based backchannel state.
+  // Prevents frame-by-frame repeated triggers during one silence period.
+  wasSpeaking: boolean;
+  pendingCandidateReadyTs: number | null;
+  lastSpeechOffsetTs: number | null;
 };
 
-// --- Changable things for the mic(amount of times a BC can be triggered etc. ALL IN MS) ---
-const BC_MICROPAUSE_MIN = 250;
-const BC_MICROPAUSE_MAX = 700;
-const BC_EOT_THRESHOLD = 1000;      // treat > this as end-of-turn 
-const BC_GLOBAL_COOLDOWN = 2500;    
+// --- Backchannel trigger configuration ---
+// Calibrated from AMI VAD holdout evaluation.
+const BC_SPEECH_CONF_THRESHOLD = 4.000;
+
+// Event-based turn-yield candidate generation.
+const BC_CANDIDATE_DELAY_MS = 350;
+const BC_EVENT_SCORE_THRESHOLD = 0.300;
+
+// Plausible pause range for turn-yield/backchannel events.
+const BC_PAUSE_MIN = 200;
+const BC_PAUSE_MAX = 2000;
+
+// Cooldowns.
+const BC_GLOBAL_COOLDOWN = 2500;
 const BC_NPC_COOLDOWN = 5000;       
 const BC_ACTION_COOLDOWN: Record<BcAction, number> = {
   NodSmall: 4000,
@@ -317,77 +332,76 @@ function normRange(value: number, min: number, max: number): number {
   return clamp01((value - min) / (max - min));
 }
 
-function absNorm(value: number, maxAbs: number): number {
-  if (!Number.isFinite(value) || maxAbs <= 0) return 0;
-  return clamp01(Math.abs(value) / maxAbs);
+
+function isCalibratedSpeaking(msg: BcFeaturesMsg): boolean {
+  return Number.isFinite(msg.speechConfidence) &&
+    msg.speechConfidence >= BC_SPEECH_CONF_THRESHOLD;
 }
 
-function chooseBackchannelAction(msg: BcFeaturesMsg): BcAction | null {
-  const normPause = normRange(msg.pauseMs, 120, 700);
-  const normSpeech = normRange(msg.speechMs, 400, 4000);
-  const normRms = normRange(msg.rmsDb, -45, -12);
-  const normF0Slope = absNorm(msg.f0Slope, 80);
-  const normFlux = normRange(msg.specFlux, 1, 6);
-  const speechConfidence = clamp01(msg.speechConfidence);
-  const boundaryConfidence = clamp01(msg.boundaryConfidence);
+function combinedStrictScore(msg: BcFeaturesMsg): number {
+  const pauseScore = normRange(msg.pauseMs, 250, 1200);
+  const boundaryScore = clamp01(msg.boundaryConfidence);
   const turnEndScore = clamp01(msg.turnEndScore);
+
+  // Low speech confidence is evidence that the user has stopped speaking.
+  const lowSpeechScore = normRange(-msg.speechConfidence, -8, 0);
+
+  return clamp01(
+    0.40 * pauseScore +
+    0.30 * boundaryScore +
+    0.20 * turnEndScore +
+    0.10 * lowSpeechScore,
+  );
+}
+
+function strictLowSpeechScore(msg: BcFeaturesMsg): number {
+  const pauseScore = normRange(msg.pauseMs, 250, 1200);
+  const boundaryScore = clamp01(msg.boundaryConfidence);
+  const turnEndScore = clamp01(msg.turnEndScore);
+
+  // Sweep-selected turn-transition score.
+  // Best holdout-selected configuration:
+  // speechConfidence >= 4.000, candidate delay = 350 ms,
+  // strictLowSpeech >= 0.300.
+  const lowSpeechScore = normRange(-msg.speechConfidence, -10, -2);
+
+  return clamp01(
+    0.35 * boundaryScore +
+    0.35 * turnEndScore +
+    0.20 * pauseScore +
+    0.10 * lowSpeechScore,
+  );
+}
+
+function chooseEventBasedAction(msg: BcFeaturesMsg): BcAction {
   const questionLike = clamp01(msg.questionLike);
-  const engagementScore = clamp01(msg.engagementScore);
-  const voicedRatio = clamp01(msg.voicedRatio);
-
-  const turnYield = clamp01(
-    0.45 * turnEndScore +
-    0.35 * boundaryConfidence +
-    0.20 * normPause,
-  );
-
+  const boundary = clamp01(msg.boundaryConfidence);
+  const turnEnd = clamp01(msg.turnEndScore);
+  const engagement = clamp01(msg.engagementScore);
   const uncertainty = clamp01(
-    0.35 * questionLike +
-    0.30 * (1 - speechConfidence) +
-    0.20 * normF0Slope +
-    0.15 * (1 - voicedRatio),
+    0.45 * questionLike +
+    0.30 * normRange(Math.abs(msg.f0Slope), 0, 80) +
+    0.25 * (1 - clamp01(msg.voicedRatio)),
   );
 
-  const arousal = clamp01(
-    0.35 * normRms +
-    0.25 * normFlux +
-    0.25 * engagementScore +
-    0.15 * voicedRatio,
-  );
-
-  const fatigueOrDisengagement = clamp01(
-    0.45 * (1 - engagementScore) +
-    0.30 * (1 - normRms) +
-    0.25 * normPause,
-  );
-
-  const strain = clamp01(
-    0.45 * normSpeech +
-    0.35 * arousal +
-    0.20 * (1 - speechConfidence),
-  );
-
-  if (turnYield > 0.62 && speechConfidence > 0.45 && uncertainty < 0.65) {
-    return "NodSmall";
-  }
-
-  if (questionLike > 0.65 && uncertainty > 0.55 && turnYield < 0.55) {
+  // The evaluated event is mainly a turn-yield cue, so NodSmall is the safest default.
+  if (questionLike > 0.65 && uncertainty > 0.55 && boundary < 0.55) {
     return "shrugandshake";
   }
 
-  if (uncertainty > 0.68 && speechConfidence < 0.55) {
+  if (uncertainty > 0.70 && engagement < 0.55) {
     return "nrub";
   }
 
-  if (fatigueOrDisengagement > 0.65 && engagementScore < 0.45) {
+  if (engagement < 0.35 && msg.speechMs > 2500) {
     return "seatAdjustment";
   }
 
-  if (strain > 0.66 && msg.speechMs > 1200 && engagementScore > 0.45) {
-    return "shoulderwarmup";
+  if (turnEnd > 0.65 && engagement > 0.45) {
+    return "NodSmall";
   }
 
-  return null;
+  return "NodSmall";
 }
 
 function chooseNpc(
@@ -412,27 +426,80 @@ function chooseNpc(
 
 function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
   const t = nowMs();
+  const speakingNow = isCalibratedSpeaking(msg);
 
- // if (msg.vad !== 1) return null;
-  if (msg.pauseMs < BC_MICROPAUSE_MIN || msg.pauseMs > BC_MICROPAUSE_MAX) return null;
-  if (msg.pauseMs >= BC_EOT_THRESHOLD) return null;
+  // While the user is speaking, reset any pending candidate.
+  if (speakingNow) {
+    st.wasSpeaking = true;
+    st.pendingCandidateReadyTs = null;
+    st.lastSpeechOffsetTs = null;
+    return null;
+  }
 
-  if (t - st.lastGlobalTs < BC_GLOBAL_COOLDOWN) return null;
+  // Detect a speech -> non-speech transition and create one delayed candidate.
+  if (st.wasSpeaking && !speakingNow) {
+    st.wasSpeaking = false;
+    st.lastSpeechOffsetTs = t;
+    st.pendingCandidateReadyTs = t + BC_CANDIDATE_DELAY_MS;
+    return null;
+  }
+
+  // No pending event candidate.
+  if (st.pendingCandidateReadyTs === null) {
+    return null;
+  }
+
+  // Wait until the event candidate is ready.
+  if (t < st.pendingCandidateReadyTs) {
+    return null;
+  }
+
+  // Consume the candidate. This prevents repeated triggers during the same pause.
+  st.pendingCandidateReadyTs = null;
+
+  // Only evaluate plausible pause regions.
+  if (msg.pauseMs < BC_PAUSE_MIN || msg.pauseMs > BC_PAUSE_MAX) {
+    return null;
+  }
+
+  if (t - st.lastGlobalTs < BC_GLOBAL_COOLDOWN) {
+    return null;
+  }
+
+  const eventScore = strictLowSpeechScore(msg);
+
+  if (eventScore < BC_EVENT_SCORE_THRESHOLD) {
+    return null;
+  }
 
   const addressee = msg.addressee ?? "UNKNOWN";
   const npc = chooseNpc(st, addressee, msg.agentsSpeaking);
   if (!npc) return null;
 
-  if (t - st.lastPerNpcTs[npc] < BC_NPC_COOLDOWN) return null;
+  if (t - st.lastPerNpcTs[npc] < BC_NPC_COOLDOWN) {
+    return null;
+  }
 
-  const action = chooseBackchannelAction(msg);
-  if (!action) return null;
+  const action = chooseEventBasedAction(msg);
 
-  if (t - st.lastPerActionTs[action] < BC_ACTION_COOLDOWN[action]) return null;
+  if (t - st.lastPerActionTs[action] < BC_ACTION_COOLDOWN[action]) {
+    return null;
+  }
 
   st.lastGlobalTs = t;
   st.lastPerNpcTs[npc] = t;
   st.lastPerActionTs[action] = t;
+
+  log({
+    type: "bc_event_trigger",
+    npc,
+    action,
+    pauseMs: msg.pauseMs,
+    speechConfidence: msg.speechConfidence,
+    boundaryConfidence: msg.boundaryConfidence,
+    turnEndScore: msg.turnEndScore,
+    strictLowSpeech: eventScore,
+  });
 
   return { type: "bc_trigger", npc, action };
 }
@@ -537,6 +604,10 @@ serve({
           seatAdjustment: 0,
           shoulderwarmup: 0,
         },
+
+        wasSpeaking: false,
+        pendingCandidateReadyTs: null,
+        lastSpeechOffsetTs: null,
       } satisfies BcState;
       
       // Initialize conversation memory for this session
@@ -552,7 +623,15 @@ serve({
 
                    //Checks for BC  features / piggyback of features and triggers.
         if (msg.type === "bc_features") {
-          console.log(`[bc_features] vad=${msg.vad} pauseMs=${msg.pauseMs} speechMs=${msg.speechMs} addr=${msg.addressee}`);
+          console.log(
+            `[bc_features] speechConf=${Number(msg.speechConfidence).toFixed(2)} ` +
+            `speaking=${isCalibratedSpeaking(msg as BcFeaturesMsg)} ` +
+            `pauseMs=${Number(msg.pauseMs).toFixed(0)} ` +
+            `boundary=${Number(msg.boundaryConfidence).toFixed(2)} ` +
+            `turnEnd=${Number(msg.turnEndScore).toFixed(2)} ` +
+            `strictLowSpeech=${strictLowSpeechScore(msg as BcFeaturesMsg).toFixed(2)} ` +
+            `addr=${msg.addressee}`
+          );
 
               const st = (ws as any).data?.bc as BcState | undefined;
              if (!st) return;

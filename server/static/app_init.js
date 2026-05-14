@@ -36,6 +36,11 @@ function initTheme() {
     state.themeToggle.addEventListener("click", () => {
       const next = document.body.dataset.theme === "dark" ? "light" : "dark";
       applyTheme(next);
+      if (state.currentMode === "clip") {
+        const player = document.getElementById("player");
+        renderClipAtTime(player ? player.currentTime || 0 : 0);
+        renderSpectrumComparison();
+      }
     });
   }
 }
@@ -56,9 +61,28 @@ function initUiHandlers() {
   document.getElementById("windowSizeSelect").addEventListener("change", (e) => {
     state.clipWindowSec = parseFloat(e.target.value);
     if (state.currentMode === "clip") {
-      renderClipAtTime(player.currentTime || 0);
+      const player = document.getElementById("player");
+      renderClipAtTime(player ? player.currentTime || 0 : 0);
+      renderSpectrumComparison();
     }
   });
+
+  if (state.channelModeSelect) {
+    state.channelModeSelect.addEventListener("change", () => {
+      if (state.uploadStatusEl) {
+        state.uploadStatusEl.textContent = "Channel mode changed. Press Process clip to recompute analysis for this channel.";
+      }
+    });
+  }
+
+  if (state.waveformModeSelect) {
+    state.waveformModeSelect.addEventListener("change", () => {
+      if (state.currentMode === "clip") {
+        const player = document.getElementById("player");
+        renderClipAtTime(player ? player.currentTime || 0 : 0);
+      }
+    });
+  }
 
   document.getElementById("micStartBtn").onclick = async () => {
     document.getElementById("micStartBtn").disabled = true;
@@ -79,6 +103,16 @@ function initUiHandlers() {
     state.clipBoundaries = [];
     state.clipDuration = 0;
     state.clipMel = null;
+    state.rawAudioBuffer = null;
+    state.processedAudioBuffer = null;
+    state.originalAudioBuffer = null;
+    state.spectra = null;
+    state.lastTiming = null;
+    state.lastStereoDiagnostics = null;
+    state.filterExperiment = null;
+    if (state.filterExperimentTable) state.filterExperimentTable.innerHTML = "";
+    if (state.filterExperimentStatus) state.filterExperimentStatus.textContent = "No experiment run yet.";
+    if (typeof renderStereoDiagnostics === "function") renderStereoDiagnostics(null, "mixdown");
     state.draggingOverview = false;
     state.liveFrames = [];
     state.liveSpecCols = [];
@@ -90,11 +124,8 @@ function initUiHandlers() {
     const segEl = document.getElementById("currentSegment");
     if (segEl) {
       const valueEl = segEl.querySelector(".segment-value");
-      if (valueEl) {
-        valueEl.textContent = "none";
-      } else {
-        segEl.textContent = "Current segment: none";
-      }
+      if (valueEl) valueEl.textContent = "none";
+      else segEl.textContent = "Current segment: none";
     }
     document.getElementById("boundaryList").innerHTML = "";
     document.getElementById("spectrogramStatus").textContent = "Upload a clip to render.";
@@ -102,6 +133,12 @@ function initUiHandlers() {
     clearCanvas(state.clipSpecOverviewCtx);
     clearCanvas(state.heatmapCtx);
     clearCanvas(state.clipWaveformCtx);
+    if (state.spectrumOriginal) clearCanvas(state.spectrumOriginal.getContext("2d"));
+    if (state.spectrumProcessed) clearCanvas(state.spectrumProcessed.getContext("2d"));
+    if (state.filterResponseCanvas) clearCanvas(state.filterResponseCanvas.getContext("2d"));
+    if (state.diffSpectrogram) clearCanvas(state.diffSpectrogram.getContext("2d"));
+    [state.channelSpectrumLeft,state.channelSpectrumRight,state.channelSpectrumMid,state.channelSpectrumSide].forEach(c => { if (c) clearCanvas(c.getContext("2d")); });
+    if (state.metricComparisonTable) state.metricComparisonTable.innerHTML = "";
     state.baselineStats = null;
     if (baselineNormalize) baselineNormalize.checked = false;
     if (baselineStatus) baselineStatus.textContent = "No baseline captured.";
@@ -116,8 +153,10 @@ function initUiHandlers() {
     if (state.currentMode !== "clip") return;
     renderClipAtTime(player.currentTime);
   });
-  player.addEventListener("play", () => {
+  player.addEventListener("play", async () => {
     if (state.currentMode !== "clip") return;
+    setupPlaybackGraph();
+    await resumePlaybackContext();
     renderClipAtTime(player.currentTime);
   });
   player.addEventListener("seeked", () => {
@@ -141,6 +180,13 @@ function initUiHandlers() {
   });
 
   document.getElementById("uploadBtn").onclick = handleClipUpload;
+
+  const runExperimentBtn = document.getElementById("runFilterExperimentBtn");
+  const exportExperimentCsvBtn = document.getElementById("exportExperimentCsvBtn");
+  const exportExperimentJsonBtn = document.getElementById("exportExperimentJsonBtn");
+  if (runExperimentBtn) runExperimentBtn.onclick = runFilterExperiment;
+  if (exportExperimentCsvBtn) exportExperimentCsvBtn.onclick = exportFilterExperimentCsv;
+  if (exportExperimentJsonBtn) exportExperimentJsonBtn.onclick = exportFilterExperimentJson;
 
   const baselineNormalize = state.baselineNormalize;
   const baselineCalibrateBtn = state.baselineCalibrateBtn;
@@ -179,8 +225,12 @@ function initUiHandlers() {
       state.showOriginal = false;
       state.activeClipVariant = "processed";
       updateViewButtons();
+      const t = player.currentTime || 0;
       player.src = "/clip_audio?variant=processed";
-      if (state.currentMode === "clip") renderClipAtTime(player.currentTime || 0);
+      player.load();
+      player.onloadedmetadata = () => { player.currentTime = Math.min(t, player.duration || t); };
+      setupPlaybackGraph();
+      if (state.currentMode === "clip") renderClipAtTime(t);
     });
   }
   if (viewOriginalBtn) {
@@ -192,8 +242,12 @@ function initUiHandlers() {
       state.showOriginal = true;
       state.activeClipVariant = "original";
       updateViewButtons();
+      const t = player.currentTime || 0;
       player.src = "/clip_audio?variant=original";
-      if (state.currentMode === "clip") renderClipAtTime(player.currentTime || 0);
+      player.load();
+      player.onloadedmetadata = () => { player.currentTime = Math.min(t, player.duration || t); };
+      setupPlaybackGraph();
+      if (state.currentMode === "clip") renderClipAtTime(t);
     });
   }
   if (overlayToggle) {
@@ -218,6 +272,11 @@ function initContext() {
   }
   window.addEventListener("resize", () => {
     if (state.clipWaveform) resizeCanvasToDisplaySize(state.clipWaveform, window.devicePixelRatio || 1);
+    if (state.currentMode === "clip") {
+      const player = document.getElementById("player");
+      renderClipAtTime(player ? player.currentTime || 0 : 0);
+      renderSpectrumComparison();
+    }
   });
 }
 
@@ -227,6 +286,7 @@ function initDashboard() {
   initTheme();
   initWs();
   initUiHandlers();
+  initPlaybackFilterClicks();
   rebuildSignalToggles();
 }
 
