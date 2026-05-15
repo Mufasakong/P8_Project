@@ -218,24 +218,64 @@ public class LlmService : MonoBehaviour
         if (baseMsg.type == "audio")
         {
             var audioMsg = JsonUtility.FromJson<AudioMsg>(raw);
+            NpcAgent targetAgent = FindNpcAgent(audioMsg != null ? audioMsg.npc : null);
             if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource != null && audioMsg.format == "pcm" && audioMsg.sampleRate > 0 && !string.IsNullOrEmpty(audioMsg.data))
             {
                 AudioClip clip = DecodePcmToClip(audioMsg.data, audioMsg.sampleRate);
                 if (clip != null)
                 {
                     elevenLabsAudioSource.clip = clip;
+                    targetAgent?.OnExternalAudioPlaybackStarted();
                     elevenLabsAudioSource.Play();
+                    StartCoroutine(NotifyElevenLabsAudioFinished(clip, targetAgent));
                     Debug.Log($"[LlmService] Playing ElevenLabs audio for npc={audioMsg.npc}, length={clip.length:F1}s");
                 }
                 else
+                {
+                    targetAgent?.OnExternalAudioPlaybackFailed($"Failed to decode ElevenLabs audio for {audioMsg.npc}.");
                     Debug.LogWarning("[LlmService] ElevenLabs audio received but PCM decode failed.");
+                }
             }
             else if (audioMsg != null && !useElevenLabsAudio)
                 Debug.Log("[LlmService] ElevenLabs audio received; enable 'Use ElevenLabs Audio' on LlmService to hear it.");
             else if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource == null)
+            {
+                targetAgent?.OnExternalAudioPlaybackFailed($"ElevenLabs audio received for {audioMsg.npc} but no AudioSource is configured.");
                 Debug.LogWarning("[LlmService] ElevenLabs audio received but no AudioSource (add one or enable Use ElevenLabs Audio).");
+            }
             return;
         }
+    }
+
+    private System.Collections.IEnumerator NotifyElevenLabsAudioFinished(AudioClip playingClip, NpcAgent targetAgent)
+    {
+        if (playingClip == null || elevenLabsAudioSource == null)
+        {
+            targetAgent?.OnExternalAudioPlaybackFailed("ElevenLabs audio playback could not start.");
+            yield break;
+        }
+
+        yield return null;
+
+        while (elevenLabsAudioSource != null && elevenLabsAudioSource.clip == playingClip && elevenLabsAudioSource.isPlaying)
+            yield return null;
+
+        targetAgent?.OnExternalAudioPlaybackEnded();
+    }
+
+    private NpcAgent FindNpcAgent(string npcName)
+    {
+        if (string.IsNullOrWhiteSpace(npcName))
+            return null;
+
+        NpcAgent[] allAgents = FindObjectsOfType<NpcAgent>();
+        foreach (NpcAgent agent in allAgents)
+        {
+            if (agent.Profile != null && agent.Profile.npcName == npcName)
+                return agent;
+        }
+
+        return null;
     }
 
     /// <summary>Decode base64 PCM 16-bit LE to Unity AudioClip (mono).</summary>

@@ -14,6 +14,9 @@ public class VoiceTest : MonoBehaviour
     [Header("UI")]
     public MicIndicator micIndicator;
 
+    [Header("Latency")]
+    public PipelineTester pipelineTester;
+
     [Header("Dev")]
     public bool useTextInput = false;
 
@@ -45,6 +48,7 @@ public class VoiceTest : MonoBehaviour
     {
         if (whisperManager == null) whisperManager = GetComponent<WhisperManager>();
         llm = FindObjectOfType<LlmService>();
+        if (pipelineTester == null) pipelineTester = FindObjectOfType<PipelineTester>();
 
         if (Microphone.devices.Length > 0) _micDevice = Microphone.devices[0];
         else Debug.LogError("No Microphone detected!");
@@ -142,6 +146,16 @@ public class VoiceTest : MonoBehaviour
         {
             var pf = prosodyClient.Latest;
 
+            if (_isCurrentlySpeaking == 0 && pf.vad > 0)
+            {
+                _isCurrentlySpeaking = 1;
+                pipelineTester?.OnUserSpeechStarted();
+            }
+            else if (_isCurrentlySpeaking == 1 && pf.vad <= 0)
+            {
+                _isCurrentlySpeaking = 0;
+            }
+
             BcFeatures bc = new BcFeatures
             {
                 vad = pf.vad,
@@ -199,7 +213,7 @@ public class VoiceTest : MonoBehaviour
         int samples = Microphone.GetPosition(_micDevice);
         Microphone.End(_micDevice);
 
-        if (samples <= 0) { Debug.Log("No audio captured."); return; }
+        if (samples <= 0) { pipelineTester?.CancelCurrentInteraction("No audio captured."); Debug.Log("No audio captured."); return; }
 
         float[] data = new float[samples * _clip.channels];
         _clip.GetData(data, 0);
@@ -208,7 +222,7 @@ public class VoiceTest : MonoBehaviour
         for (int i = 0; i < data.Length; i++) { float a = Mathf.Abs(data[i]); if (a > peak) peak = a; }
         Debug.Log($"Processing {samples / (float)_clip.frequency:F1}s | peak: {peak:F4} | ch: {_clip.channels} | freq: {_clip.frequency}");
 
-        if (peak < 0.01f) { Debug.LogWarning("Mic audio too quiet — check your mic input!"); return; }
+        if (peak < 0.01f) { pipelineTester?.CancelCurrentInteraction("Mic audio too quiet."); Debug.LogWarning("Mic audio too quiet — check your mic input!"); return; }
 
         var trimmed = AudioClip.Create("trimmed", samples, _clip.channels, _clip.frequency, false);
         trimmed.SetData(data, 0);
@@ -218,7 +232,11 @@ public class VoiceTest : MonoBehaviour
         Debug.Log($"<color=green>Heard:</color> {text}");
 
         if (string.IsNullOrEmpty(text) || text.Length < 2
-            || text.Contains("[BLANK") || text.Contains("(BLANK")) return;
+            || text.Contains("[BLANK") || text.Contains("(BLANK"))
+        {
+            pipelineTester?.CancelCurrentInteraction("Transcription was empty or blank.");
+            return;
+        }
 
         Broadcast(text);
     }
@@ -227,6 +245,15 @@ public class VoiceTest : MonoBehaviour
     {
         Debug.Log($"<color=white>[Broadcast]</color> {text}");
         // Just send it to the first agent we find. The Bun server will decide who actually speaks!
-        FindObjectOfType<NpcAgent>().Say(text);
+        NpcAgent agent = FindObjectOfType<NpcAgent>();
+        if (agent == null)
+        {
+            pipelineTester?.CancelCurrentInteraction("No NpcAgent found for broadcast.");
+            Debug.LogWarning("[VoiceTest] No NpcAgent found to receive broadcast.");
+            return;
+        }
+
+        pipelineTester?.OnUserInputSubmitted(text);
+        agent.Say(text);
     }
 }

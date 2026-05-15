@@ -10,6 +10,8 @@ public class NpcAgent : MonoBehaviour
     public PiperManager piperManager;
     public Animator animator;
     public EyeContactIK eyeContactIK;
+    public PipelineTester pipelineTester;
+    public float externalAudioTimeoutSeconds = 10f;
 
     [Header("Facial Blendshapes")]
     public SkinnedMeshRenderer faceMesh;
@@ -25,6 +27,8 @@ public class NpcAgent : MonoBehaviour
     private AudioSource audioSource;
     private LlmService llm;
     private ConversationMemory conversationMemory;
+    private Coroutine externalAudioTimeoutCoroutine;
+    private int pendingResponseTokenCount = 0;
     private static readonly Regex FinalTtsTagOrBraceBlock = new Regex(@"\[[^\]]*\]|\{[^}]*\}", RegexOptions.Compiled);
     private static readonly Regex FinalTtsForbiddenChars = new Regex(@"[\[\]\{\}/]", RegexOptions.Compiled);
     private static readonly Regex MultiWhitespace = new Regex(@"\s{2,}", RegexOptions.Compiled);
@@ -50,6 +54,7 @@ public class NpcAgent : MonoBehaviour
         llm = FindObjectOfType<LlmService>();
         conversationMemory = GetComponent<ConversationMemory>();
         audioSource = GetComponent<AudioSource>();
+        if (pipelineTester == null) pipelineTester = FindObjectOfType<PipelineTester>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
         if (eyeContactIK == null) eyeContactIK = GetComponent<EyeContactIK>();
@@ -110,11 +115,14 @@ public class NpcAgent : MonoBehaviour
         Debug.Log($"<color=cyan>[{Profile.npcName} TTS INPUT]</color> {cleanDialogue}");
         if (conversationMemory != null) conversationMemory.StoreResponse(cleanDialogue);
         OnResponseReceived?.Invoke(cleanDialogue);
+        int tokenCount = CountApproximateTokens(cleanDialogue);
+        pendingResponseTokenCount = tokenCount;
+        pipelineTester?.OnFirstResponseReceived(cleanDialogue, tokenCount);
 
-        GenerateAndPlay(cleanDialogue, timedTags);
+        GenerateAndPlay(cleanDialogue, timedTags, tokenCount);
     }
 
-    async void GenerateAndPlay(string cleanText, List<TimedTag> timedTags)
+    async void GenerateAndPlay(string cleanText, List<TimedTag> timedTags, int tokenCount)
     {
         AudioClip clip = null;
 
@@ -133,17 +141,101 @@ public class NpcAgent : MonoBehaviour
                 if (clip != null)
                 {
                     audioSource.clip = clip;
+                    pipelineTester?.OnAudioPlaybackStarted();
                     audioSource.Play();
                 }
             }
         }
-        else if (audioSource.clip != null)
+        else if (audioSource.clip != null && audioSource.isPlaying)
         {
             clip = audioSource.clip;
+            pipelineTester?.OnAudioPlaybackStarted();
+        }
+
+        if (clip != null)
+        {
+            StartCoroutine(NotifyAudioPlaybackFinished(clip, tokenCount));
+        }
+        else if (llm != null && llm.useElevenLabsAudio)
+        {
+            BeginExternalAudioTimeout();
+            Debug.Log($"[NpcAgent] Waiting for ElevenLabs audio playback hook for {Profile.npcName}.");
+        }
+        else
+        {
+            pipelineTester?.OnAudioPlaybackEnded(tokenCount);
+            pendingResponseTokenCount = 0;
         }
 
         float duration = clip != null ? clip.length : 3.0f;
         StartCoroutine(PlayAnimationTimeline(timedTags, duration));
+    }
+
+    private IEnumerator NotifyAudioPlaybackFinished(AudioClip playingClip, int tokenCount)
+    {
+        if (playingClip == null)
+        {
+            pipelineTester?.OnAudioPlaybackEnded(tokenCount);
+            yield break;
+        }
+
+        yield return null;
+
+        while (audioSource != null && audioSource.clip == playingClip && audioSource.isPlaying)
+            yield return null;
+
+        pipelineTester?.OnAudioPlaybackEnded(tokenCount);
+        pendingResponseTokenCount = 0;
+    }
+
+    public void OnExternalAudioPlaybackStarted()
+    {
+        CancelExternalAudioTimeout();
+        pipelineTester?.OnAudioPlaybackStarted();
+    }
+
+    public void OnExternalAudioPlaybackEnded()
+    {
+        CancelExternalAudioTimeout();
+        pipelineTester?.OnAudioPlaybackEnded(pendingResponseTokenCount);
+        pendingResponseTokenCount = 0;
+    }
+
+    public void OnExternalAudioPlaybackFailed(string reason)
+    {
+        CancelExternalAudioTimeout();
+        pipelineTester?.CancelCurrentInteraction(reason);
+        pendingResponseTokenCount = 0;
+    }
+
+    private void BeginExternalAudioTimeout()
+    {
+        CancelExternalAudioTimeout();
+        externalAudioTimeoutCoroutine = StartCoroutine(WaitForExternalAudioTimeout());
+    }
+
+    private void CancelExternalAudioTimeout()
+    {
+        if (externalAudioTimeoutCoroutine == null)
+            return;
+
+        StopCoroutine(externalAudioTimeoutCoroutine);
+        externalAudioTimeoutCoroutine = null;
+    }
+
+    private IEnumerator WaitForExternalAudioTimeout()
+    {
+        yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, externalAudioTimeoutSeconds));
+        externalAudioTimeoutCoroutine = null;
+        OnExternalAudioPlaybackFailed($"Timed out waiting for ElevenLabs audio for {Profile?.npcName ?? name}.");
+    }
+
+    private int CountApproximateTokens(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+
+        string[] parts = text.Split((char[])null, System.StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length;
     }
 
     private string BuildFinalTtsText(string text)
@@ -316,6 +408,7 @@ public class NpcAgent : MonoBehaviour
 
     void OnDestroy()
     {
+        CancelExternalAudioTimeout();
         if (llm != null) llm.OnBackchannel -= HandleRealTimeBackchannel;
     }
 }
