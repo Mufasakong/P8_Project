@@ -1,0 +1,93 @@
+﻿[Debug Log Buffer]
+[2026-05-16 17:57:11.441] [PipelineTester] ✅ Monitoring enabled. CSV: Assets/Scripts/Latency/Results\latency_results_2026_05_16_17_57_11.csv
+[2026-05-16 17:57:15.585] <color=cyan>[HR TTS INPUT]</color> It is great  to meet you and  I am excited to  learn a little more  about what drives you  to pursue this role  in IT.
+[2026-05-16 17:57:15.585] [PipelineTester] First response received: 'It is great  to meet you and  I am excit'
+[2026-05-16 17:57:23.835] [Latency] Measurement started: Test_175723_835
+[2026-05-16 17:57:29.011] <color=white>[Broadcast]</color> Hello, I have always had a great passion for everything interactive and everything I teer related.
+[2026-05-16 17:57:29.012] [Latency] Input Sent
+[2026-05-16 17:57:29.012] [PipelineTester] Input submitted: 'Hello, I have always had a great passion'
+[2026-05-16 17:57:30.720] <color=cyan>[HR TTS INPUT]</color> That sounds like  a wonderful enthusiasm to  bring to our team  environment. Let us talk  a bit about how  you work with others.  Can you describe a  time you collaborated on  a project or task  where you had to  rely on someone else's  help?
+[2026-05-16 17:57:30.720] [Latency] First Token Received
+[2026-05-16 17:57:30.720] [PipelineTester] First response received: 'That sounds like  a wonderful enthusiasm'
+[2026-05-16 17:57:30.859] [Latency] First Audio Playback
+[2026-05-16 17:57:41.598] [Latency] Audio Playback Completed
+[2026-05-16 17:57:41.601] [Latency] 🤖 Saved: STT=5177ms, TTFT=1708ms, TTFB=1847ms, E2E=12586ms
+[2026-05-16 17:57:41.602] [PipelineTester] Interaction #1 ended. Tokens: 44
+[2026-05-16 17:57:43.716] [Latency] Measurement started: Test_175743_716
+[2026-05-16 17:57:56.034] <color=white>[Broadcast]</color> So there have been a bunch of things such as in a group work sitting where I've been a university and somebody I've had issued something at the NAD to help them out or vice versa with their head to help me out.
+[2026-05-16 17:57:56.035] [Latency] Input Sent
+[2026-05-16 17:57:56.035] [PipelineTester] Input submitted: 'So there have been a bunch of things suc'
+[2026-05-16 17:57:57.650] <color=cyan>[TECH TTS INPUT]</color> It sounds like  you helped each other  out when you ran  into trouble, which is  great. Can you describe  a specific small task  where you had to  explain a technical solution  to someone else who  was struggling?
+[2026-05-16 17:57:57.650] [Latency] First Token Received
+[2026-05-16 17:57:57.651] [PipelineTester] First response received: 'It sounds like  you helped each other  o'
+[2026-05-16 17:57:57.766] [Latency] First Audio Playback
+[2026-05-16 17:58:09.292] [Latency] Audio Playback Completed
+[2026-05-16 17:58:09.294] [Latency] 🤖 Saved: STT=12318ms, TTFT=1616ms, TTFB=1733ms, E2E=13258ms
+[2026-05-16 17:58:09.295] [PipelineTester] Interaction #2 ended. Tokens: 37
+[2026-05-16 17:58:14.981] [Latency] Measurement started: Test_175814_981
+[2026-05-16 17:58:24.055] <color=white>[Broadcast]</color> Yes, of course, you have to take it from their perspective. If something is not a faithful, you have to chunk it down a little bit and make it just a bull for them.
+[2026-05-16 17:58:24.055] [Latency] Input Sent
+[2026-05-16 17:58:24.056] [PipelineTester] Input submitted: 'Yes, of course, you have to take it from'
+[2026-05-16 17:58:25.844] <color=cyan>[TECH TTS INPUT]</color> That is a  solid approach for a  support role, but I  would love to know  how you actually handle  a situation where you  are not sure what  the problem is. How  do you ask for  help without wasting time  or making the issue  worse?
+[2026-05-16 17:58:25.844] [Latency] First Token Received
+[2026-05-16 17:58:25.844] [PipelineTester] First response received: 'That is a  solid approach for a  support'
+[2026-05-16 17:58:25.958] [Latency] First Audio Playback
+[2026-05-16 17:58:37.893] [Latency] Audio Playback Completed
+[2026-05-16 17:58:37.894] [Latency] 🤖 Saved: STT=9074ms, TTFT=1789ms, TTFB=1903ms, E2E=13838ms
+[2026-05-16 17:58:37.894] [PipelineTester] Interaction #3 ended. Tokens: 44
+[2026-05-16 17:58:40.126] [Latency] Measurement started: Test_175840_126
+[2026-05-16 17:59:07.694] <color=white>[Broadcast]</color> Firstly, you have to understand what is the problem. You have to have a helicopter view over it. And from there, you will be truly able to understand what you need to help with. Because if you just push the project or the issue or to another person, they'll perhaps either run into the same issues. If you have already tried to debug the problem, so I step as step explain what you have done so far.
+[2026-05-16 17:59:07.696] [Latency] Input Sent
+[2026-05-16 17:59:07.696] [PipelineTester] Input submitted: 'Firstly, you have to understand what is '
+[2026-05-16 17:59:09.754] <color=cyan>[HR TTS INPUT]</color> I appreciate how  you focus on solving  the root cause before  asking for assistance. Taking  ownership of a problem  until you have a  clear understanding is exactly  what we look for  in an entry-level assistant.  Can you give an  example of a time  you followed through on  a task even after  the initial instructions were  unclear?
+[2026-05-16 17:59:09.754] [Latency] First Token Received
+[2026-05-16 17:59:09.754] [PipelineTester] First response received: 'I appreciate how  you focus on solving  '
+[2026-05-16 17:59:09.927] [Latency] First Audio Playback
+[2026-05-16 17:59:24.860] [Latency] Audio Playback Completed
+[2026-05-16 17:59:24.861] [Latency] 🤖 Saved: STT=27570ms, TTFT=2058ms, TTFB=2231ms, E2E=17164ms
+[2026-05-16 17:59:24.861] [PipelineTester] Interaction #4 ended. Tokens: 56
+[2026-05-16 17:59:59.977] [Latency] Measurement started: Test_175959_977
+[2026-05-16 18:00:14.410] <color=white>[Broadcast]</color> There have been plenty of things where I don't understood the problem, but I have taken ownership of it by taking ownership. I have seen it from a lot of different sides. Afterwards, we've been able to ask myself how to solve this issue and by taking proactive measures.
+[2026-05-16 18:00:14.411] [Latency] Input Sent
+[2026-05-16 18:00:14.412] [PipelineTester] Input submitted: 'There have been plenty of things where I'
+[2026-05-16 18:00:16.471] <color=cyan>[TECH TTS INPUT]</color> That is a  very good mindset for  a new role. Since  this is an entry-level  position, tell me about  a time when you  were given a specific  set of instructions for  a task and you  had to troubleshoot a  small error on your  own before asking for  help.
+[2026-05-16 18:00:16.472] [Latency] First Token Received
+[2026-05-16 18:00:16.472] [PipelineTester] First response received: 'That is a  very good mindset for  a new '
+[2026-05-16 18:00:16.619] [Latency] First Audio Playback
+[2026-05-16 18:00:28.703] [Latency] Audio Playback Completed
+[2026-05-16 18:00:28.704] [Latency] 🤖 Saved: STT=14434ms, TTFT=2060ms, TTFB=2208ms, E2E=14292ms
+[2026-05-16 18:00:28.705] [PipelineTester] Interaction #5 ended. Tokens: 48
+[2026-05-16 18:00:31.409] [Latency] Measurement started: Test_180031_409
+[2026-05-16 18:00:57.407] <color=white>[Broadcast]</color> If I had to take a clearest example, little would have been a big incident issue, we had at our current station. The incident was out, we had to look at what caused the out-grage and by searching up on the incident, we found out that CloudFair actually had a big mistake on their side, so it actually wasn't an internal issue, but first we had to look at if anything was wrong with our equipment before we had to do Elf Deber.
+[2026-05-16 18:00:57.407] [Latency] Input Sent
+[2026-05-16 18:00:57.408] [PipelineTester] Input submitted: 'If I had to take a clearest example, lit'
+[2026-05-16 18:00:59.486] <color=cyan>[TECH TTS INPUT]</color> That is a  good example of checking  your own equipment first  before blaming external services,  but I want to  dig a little deeper  into your thought process.  Can you walk me  through the exact steps  you took to check  if your equipment was  actually functioning correctly?
+[2026-05-16 18:00:59.486] [Latency] First Token Received
+[2026-05-16 18:00:59.486] [PipelineTester] First response received: 'That is a  good example of checking  you'
+[2026-05-16 18:00:59.615] [Latency] First Audio Playback
+[2026-05-16 18:01:13.319] [Latency] Audio Playback Completed
+[2026-05-16 18:01:13.320] [Latency] 🤖 Saved: STT=25998ms, TTFT=2079ms, TTFB=2208ms, E2E=15912ms
+[2026-05-16 18:01:13.320] [PipelineTester] Interaction #6 ended. Tokens: 46
+[2026-05-16 18:01:15.358] [Latency] Measurement started: Test_180115_358
+[2026-05-16 18:01:34.517] <color=white>[Broadcast]</color> Well, that's obviously been by starting by checking the hardware equipment first. See if anything was unplugged or unplugged incorrectly and afterwards you could have diagnosed the internet and by diagnosing the network connections. There you could see if the connection was actually set up correctly or not.
+[2026-05-16 18:01:34.518] [Latency] Input Sent
+[2026-05-16 18:01:34.519] [PipelineTester] Input submitted: 'Well, that's obviously been by starting '
+[2026-05-16 18:01:40.828] <color=cyan>[TECH TTS INPUT]</color> That sounds like  a practical approach to  isolating the issue before  asking for help. If  the hardware and connection  are working but the  software still fails, what  is your next step  to figure out what  is going wrong?
+[2026-05-16 18:01:40.828] [Latency] First Token Received
+[2026-05-16 18:01:40.830] [PipelineTester] First response received: 'That sounds like  a practical approach t'
+[2026-05-16 18:01:40.959] [Latency] First Audio Playback
+[2026-05-16 18:01:52.847] [Latency] Audio Playback Completed
+[2026-05-16 18:01:52.849] [Latency] 🤖 Saved: STT=19160ms, TTFT=6310ms, TTFB=6441ms, E2E=18329ms
+[2026-05-16 18:01:52.849] [PipelineTester] Interaction #7 ended. Tokens: 38
+[2026-05-16 18:02:00.089] [Latency] Measurement started: Test_180200_089
+[2026-05-16 18:02:07.961] <color=white>[Broadcast]</color> [typing] I would try to
+[2026-05-16 18:02:07.962] [Latency] Input Sent
+[2026-05-16 18:02:07.962] [PipelineTester] Input submitted: '[typing] I would try to'
+[2026-05-16 18:02:12.848] <color=cyan>[HR TTS INPUT]</color> I appreciate your  willingness to learn and  your practical troubleshooting approach.  We have covered a  lot today, so let  me wrap up. Do  you have any questions  for us about the  role or the team  environment?
+[2026-05-16 18:02:12.849] [Latency] First Token Received
+[2026-05-16 18:02:12.849] [PipelineTester] First response received: 'I appreciate your  willingness to learn '
+[2026-05-16 18:02:13.016] <color=white>[Broadcast]</color> I'll try to triangulate the issue.
+[2026-05-16 18:02:13.016] [PipelineTester] Input submitted: 'I'll try to triangulate the issue.'
+[2026-05-16 18:02:13.017] [Latency] First Audio Playback
+[2026-05-16 18:02:18.985] <color=cyan>[HR TTS INPUT]</color> I appreciate your  willingness to learn and  your practical troubleshooting approach.  We have covered a  lot today, so let  me wrap up. Do  you have any questions  for us about the  role or the team  environment?
+[2026-05-16 18:02:18.986] [PipelineTester] First response received: 'I appreciate your  willingness to learn '

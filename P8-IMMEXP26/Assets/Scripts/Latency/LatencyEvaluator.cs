@@ -14,12 +14,14 @@ public class LatencyEvaluator : MonoBehaviour
 {
     public static LatencyEvaluator Instance { get; private set; }
 
+    private const string CsvSeparator = ";";
+
     [Header("Output")]
     [Tooltip("Keep this recorder alive across scene loads so one CSV can span a full interview session.")]
     public bool persistAcrossScenes = true;
 
     [Tooltip("Absolute folder path where latency files should be written.")]
-    public string outputDirectoryOverride = @"C:\Users\Bruger\OneDrive\Dokumenter\GitHub\P8_Project\P8-IMMEXP26\Assets\Scripts\Latency\Results";
+    public string outputDirectoryOverride = @"Assets/Scripts/Latency/Results";
 
     [Tooltip("Capture relevant Unity logs to a sidecar text file for debugging and recovery.")]
     public bool captureDebugLogs = true;
@@ -27,8 +29,11 @@ public class LatencyEvaluator : MonoBehaviour
     [Tooltip("Allow context-menu recovery from the captured debug log file.")]
     public bool enableDebugLogFallback = true;
 
-    [Tooltip("Write one human-readable .txt summary file for each completed interaction.")]
-    public bool writePerTestTextSummary = true;
+    [Tooltip("Write one shared text summary file for the full latency test session.")]
+    public bool writeSessionTextSummary = true;
+
+    [Tooltip("Optional: also write one separate .txt file for each completed interaction. Usually keep this false to avoid clutter.")]
+    public bool writePerTestTextSummary = false;
 
     [Header("Debug")]
     [Tooltip("Print a short measurement summary whenever a row is saved.")]
@@ -65,6 +70,7 @@ public class LatencyEvaluator : MonoBehaviour
     private string resultsDirectoryPath;
     private string csvFilePath;
     private string debugLogPath;
+    private string summaryFilePath;
     private readonly List<LatencyMeasurement> allMeasurements = new List<LatencyMeasurement>();
     private readonly Queue<string> debugLogBuffer = new Queue<string>();
     private readonly HashSet<string> savedMeasurementIds = new HashSet<string>();
@@ -80,6 +86,7 @@ public class LatencyEvaluator : MonoBehaviour
     public string ResultsDirectoryPath => resultsDirectoryPath;
     public string CsvFilePath => csvFilePath;
     public string DebugLogPath => debugLogPath;
+    public string SummaryFilePath => summaryFilePath;
 
     void Awake()
     {
@@ -136,10 +143,17 @@ public class LatencyEvaluator : MonoBehaviour
         string timestamp = DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss");
         csvFilePath = Path.Combine(outputDirectoryPath, $"latency_results_{timestamp}.csv");
         debugLogPath = Path.Combine(outputDirectoryPath, $"debug_log_{timestamp}.txt");
+        summaryFilePath = Path.Combine(outputDirectoryPath, $"latency_summary_{timestamp}.txt");
 
         var header = new StringBuilder();
-        header.AppendLine("TestID,Timestamp,STT_Latency_ms,TTFT_ms,TTFB_Audio_ms,E2E_Latency_ms,TokenCount,TokensPerSec,Source");
+        // The sep=; line tells Excel to split the CSV into clean columns,
+        // which is especially useful on systems where comma-separated CSV opens in one cell.
+        header.AppendLine("sep=;");
+        header.AppendLine("TestID;Timestamp;STT_Latency_ms;TTFT_ms;TTFB_Audio_ms;E2E_Latency_ms;TokenCount;TokensPerSec;Source");
         TryWriteAllText(csvFilePath, header.ToString(), "initialize CSV file");
+
+        if (writeSessionTextSummary)
+            WriteSessionSummaryHeader();
 
         if (captureDebugLogs)
             TryWriteAllText(debugLogPath, "[Debug Log Buffer]\n", "initialize debug log file");
@@ -147,7 +161,9 @@ public class LatencyEvaluator : MonoBehaviour
         outputFilesInitialized = true;
 
         Debug.Log($"[LatencyEvaluator] ✅ Initialized. Results: {csvFilePath}");
-        Debug.Log($"[LatencyEvaluator] 📁 Per-test results: {resultsDirectoryPath}");
+        Debug.Log($"[LatencyEvaluator] 📁 Results folder: {resultsDirectoryPath}");
+        if (writeSessionTextSummary)
+            Debug.Log($"[LatencyEvaluator] 🧾 Summary: {summaryFilePath}");
         if (captureDebugLogs)
             Debug.Log($"[LatencyEvaluator] 📋 Debug logs: {debugLogPath}");
     }
@@ -341,19 +357,9 @@ public class LatencyEvaluator : MonoBehaviour
 
         allMeasurements.Add(measurement);
 
-        var sb = new StringBuilder();
-        sb.Append(EscapeCsv(measurement.testId)).Append(",");
-        sb.Append(measurement.timestamp).Append(",");
-        sb.Append(measurement.sttLatencyMs.ToString("F2", CultureInfo.InvariantCulture)).Append(",");
-        sb.Append(measurement.ttftMs.ToString("F2", CultureInfo.InvariantCulture)).Append(",");
-        sb.Append(measurement.ttfbAudioMs.ToString("F2", CultureInfo.InvariantCulture)).Append(",");
-        sb.Append(measurement.e2eLatencyMs.ToString("F2", CultureInfo.InvariantCulture)).Append(",");
-        sb.Append(measurement.tokenCount).Append(",");
-        sb.Append(measurement.tokensPerSec.ToString("F2", CultureInfo.InvariantCulture)).Append(",");
-        sb.AppendLine(EscapeCsv(measurement.source));
+        TryAppendAllText(csvFilePath, BuildCsvRow(measurement), "append CSV measurement");
 
-        TryAppendAllText(csvFilePath, sb.ToString(), "append CSV measurement");
-
+        AppendMeasurementToSessionSummary(measurement);
         WriteMeasurementSummaryFile(measurement);
 
         if (logMeasurementSummary)
@@ -361,6 +367,54 @@ public class LatencyEvaluator : MonoBehaviour
             string sourceStr = measurement.source == "hook" ? "🤖" : "📋";
             Debug.Log($"[Latency] {sourceStr} Saved: STT={measurement.sttLatencyMs:F0}ms, TTFT={measurement.ttftMs:F0}ms, TTFB={measurement.ttfbAudioMs:F0}ms, E2E={measurement.e2eLatencyMs:F0}ms");
         }
+    }
+
+    private string BuildCsvRow(LatencyMeasurement measurement)
+    {
+        var sb = new StringBuilder();
+        sb.Append(EscapeCsv(measurement.testId)).Append(CsvSeparator);
+        sb.Append(measurement.timestamp).Append(CsvSeparator);
+        sb.Append(measurement.sttLatencyMs.ToString("F2", CultureInfo.InvariantCulture)).Append(CsvSeparator);
+        sb.Append(measurement.ttftMs.ToString("F2", CultureInfo.InvariantCulture)).Append(CsvSeparator);
+        sb.Append(measurement.ttfbAudioMs.ToString("F2", CultureInfo.InvariantCulture)).Append(CsvSeparator);
+        sb.Append(measurement.e2eLatencyMs.ToString("F2", CultureInfo.InvariantCulture)).Append(CsvSeparator);
+        sb.Append(measurement.tokenCount).Append(CsvSeparator);
+        sb.Append(measurement.tokensPerSec.ToString("F2", CultureInfo.InvariantCulture)).Append(CsvSeparator);
+        sb.AppendLine(EscapeCsv(measurement.source));
+        return sb.ToString();
+    }
+
+    private void WriteSessionSummaryHeader()
+    {
+        if (string.IsNullOrEmpty(summaryFilePath))
+            return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Latency Result Summary");
+        sb.AppendLine($"Created: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine();
+        sb.AppendLine("Test ID                 | STT (ms) | TTFT (ms) | TTFB (ms) | E2E (ms)");
+        sb.AppendLine("------------------------|----------|-----------|-----------|---------");
+
+        TryWriteAllText(summaryFilePath, sb.ToString(), "initialize latency summary file");
+    }
+
+    private void AppendMeasurementToSessionSummary(LatencyMeasurement measurement)
+    {
+        if (!writeSessionTextSummary || measurement == null || string.IsNullOrEmpty(summaryFilePath))
+            return;
+
+        string line = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0,-23} | {1,8:F2} | {2,9:F2} | {3,9:F2} | {4,8:F2}{5}",
+            measurement.testId,
+            measurement.sttLatencyMs,
+            measurement.ttftMs,
+            measurement.ttfbAudioMs,
+            measurement.e2eLatencyMs,
+            Environment.NewLine);
+
+        TryAppendAllText(summaryFilePath, line, "append latency summary measurement");
     }
 
     private void WriteMeasurementSummaryFile(LatencyMeasurement measurement)
@@ -412,7 +466,7 @@ public class LatencyEvaluator : MonoBehaviour
         if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        bool mustQuote = value.Contains(",") || value.Contains("\"") || value.Contains("\n") || value.Contains("\r");
+        bool mustQuote = value.Contains(CsvSeparator) || value.Contains("\"") || value.Contains("\n") || value.Contains("\r");
         string escaped = value.Replace("\"", "\"\"");
         return mustQuote ? $"\"{escaped}\"" : escaped;
     }
@@ -522,7 +576,7 @@ public class LatencyEvaluator : MonoBehaviour
     {
         try
         {
-            File.WriteAllText(path, content);
+            File.WriteAllText(path, content, Encoding.UTF8);
             return true;
         }
         catch (IOException exception)
@@ -541,7 +595,7 @@ public class LatencyEvaluator : MonoBehaviour
     {
         try
         {
-            File.AppendAllText(path, content);
+            File.AppendAllText(path, content, Encoding.UTF8);
             return true;
         }
         catch (IOException exception)

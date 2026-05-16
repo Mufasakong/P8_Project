@@ -1280,6 +1280,8 @@ MonoBehaviour:
   piperManager: {fileID: 778233026}
   animator: {fileID: 1913966190}
   eyeContactIK: {fileID: 707502117}
+  pipelineTester: {fileID: 0}
+  externalAudioTimeoutSeconds: 10
   faceMesh: {fileID: 80285965}
   smileBlendshapes:
   - Mouth_Smile_L
@@ -1365,6 +1367,7 @@ MonoBehaviour:
   whisperManager: {fileID: 0}
   recordAction: {fileID: 0}
   micIndicator: {fileID: 0}
+  pipelineTester: {fileID: 0}
   useTextInput: 0
   vadThreshold: 0.015
   vadUpdateInterval: 0.1
@@ -2840,7 +2843,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: com.whisper.unity::Whisper.WhisperManager
   logLevel: 1
-  modelPath: Whisper/ggml-base.en.bin
+  modelPath: Whisper/ggml-base.bin
   isModelPathInStreamingAssets: 1
   initOnAwake: 1
   useGpu: 1
@@ -3250,6 +3253,76 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!1 &1518685545
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1518685548}
+  - component: {fileID: 1518685546}
+  - component: {fileID: 1518685549}
+  m_Layer: 0
+  m_Name: LatencyManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1518685546
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1518685545}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2cfe9ecdcfa0a3143919c2db6d925d71, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PipelineTester
+  startMonitoringOnStart: 1
+  maxInteractionsToLog: 0
+  autoFindEvaluator: 1
+  enableLogFallback: 1
+  latencyEvaluator: {fileID: 1518685549}
+--- !u!4 &1518685548
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1518685545}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1518685549
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1518685545}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5432c05e50dd87346843f38dc60eef92, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LatencyEvaluator
+  persistAcrossScenes: 1
+  outputDirectoryOverride: Assets/Scripts/Latency/Results
+  captureDebugLogs: 1
+  enableDebugLogFallback: 1
+  writeSessionTextSummary: 1
+  writePerTestTextSummary: 0
+  logMeasurementSummary: 1
+  maxBufferedLogLines: 200
 --- !u!1 &1549052245 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5722576946961542989, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
@@ -47650,3 +47723,4 @@ SceneRoots:
   - {fileID: 673063694}
   - {fileID: 1756928732}
   - {fileID: 514244905}
+  - {fileID: 1518685548}
