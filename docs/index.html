@@ -32,153 +32,47 @@
         </header>
 
         <div class="content">
+            <!-- Intro card: groups intro + authors + about + objectives in one panel -->
             <section class="description">
-                <h2 id="introduction">Introduction</h2>
-                <p>
-                    Welcome to the P8 Project page. Building on our P7 work, this semester explores a
-                    real-time, locally executed multi-agent conversational system in VR, with a focus on
-                    adaptive turn-taking, non-verbal behaviors, and low-latency interaction.
-                </p>
-                <p>
-                    The current prototype centers on an interview scenario where a user interacts with
-                    LLM-driven NPC agents inside a Unity environment, supported by a backend that handles
-                    speech recognition, prosody analysis, language generation, and speech synthesis.
-                </p>
-
-                <h3 id="authors">Authors</h3>
-                <ul class="author-list">
-                    <li>Simon Ingemann Axelsen</li>
-                    <li>Frederik Vilhelmsen</li>
-                    <li><em>TODO: add remaining team members</em></li>
-                </ul>
-
-                <h3 id="about">About the project</h3>
-                <p>
-                    The system pairs a Unity VR client (HDRP, XR rig, Reallusion CC characters) with a
-                    backend stack that orchestrates speech-to-text, dialogue, prosody, and speech output
-                    for one or more NPC agents. All inference runs locally to keep latency low and protect
-                    user privacy: no conversation audio or transcripts leave the machine by default.
-                </p>
-                <p>
-                    A typical session is an interview: the user wears the headset, speaks to one or more
-                    NPC interviewers, and receives spoken, animated, and gaze-aware responses. The system
-                    also supports backchannels (e.g. short acknowledgments like "mhm", nods) and an
-                    evaluator module that scores the interview after it ends.
-                </p>
-
-                <h3 id="objectives">Objectives</h3>
-                <ul>
-                    <li>Reduce end-to-end response latency for multi-party VR conversations</li>
-                    <li>Coordinate turn-taking, backchannels, and gaze across multiple NPCs</li>
-                    <li>Run STT, LLM, and TTS locally to preserve privacy</li>
-                    <li>Provide automated, structured evaluation of interview sessions</li>
-                </ul>
+                <div data-include="sections/intro.html"></div>
+                <div data-include="sections/authors.html"></div>
+                <div data-include="sections/about.html"></div>
+                <div data-include="sections/objectives.html"></div>
             </section>
 
-            <section class="description">
-                <h2 id="architecture">System architecture</h2>
-                <p>The prototype is split into a Unity client and a local backend:</p>
-                <ul>
-                    <li><strong>Unity VR client</strong> (<code>P8-IMMEXP26/</code>) — HDRP scene, XR rig,
-                        Reallusion CC characters, NPC behavior scripts, animation and gaze controllers,
-                        and a WebSocket client</li>
-                    <li><strong>Bun WebSocket server</strong> (<code>server/index.ts</code>) — the main
-                        orchestrator, routing speech, dialogue, and control messages between Unity and the
-                        other services</li>
-                    <li><strong>Prosody server</strong> (<code>server/prosody_server.py</code>,
-                        <code>prosody_core.py</code>) — Python service that analyzes audio features used
-                        for turn-taking and backchannel decisions</li>
-                    <li><strong>Ollama</strong> — runs local LLMs with custom Modelfiles
-                        (<code>server/modelfiles/Modelfile.interviewer</code>) to drive interviewer NPCs</li>
-                    <li><strong>Whisper.cpp</strong> — local speech-to-text using
-                        <code>ggml-base.en.bin</code> in <code>Assets/StreamingAssets/Whisper/</code></li>
-                    <li><strong>ElevenLabs / Piper TTS</strong> (<code>server/elevenlabs.ts</code>,
-                        <code>Assets/Piper/</code>) — speech synthesis, with a local Piper option for the
-                        fully offline path</li>
-                    <li><strong>Evaluator</strong> (<code>server/evaluator.ts</code>) — post-session module
-                        that scores the interview based on the conversation log</li>
-                </ul>
-                <p class="todo">
-                    <em>TODO: insert system architecture diagram (see <code>DIAGRAMS.md</code> #1).</em>
-                </p>
-            </section>
-
-            <section class="description">
-                <h2 id="features">Key features</h2>
-                <ul>
-                    <li><strong>Adaptive turn-taking</strong> — prosody-aware decisions about when an NPC
-                        should start, hold, or yield the floor</li>
-                    <li><strong>Backchannels</strong> — short verbal and non-verbal acknowledgments with
-                        cooldowns and action variety</li>
-                    <li><strong>Gaze state machine</strong> — NPCs direct attention to the active speaker
-                        and other agents in a believable way</li>
-                    <li><strong>Phased interview flow</strong> — structured stages (intro, questions,
-                        wrap-up) governed by an activity-style flow</li>
-                    <li><strong>Local-first inference</strong> — STT, LLM, and (optionally) TTS all run on
-                        the same machine</li>
-                    <li><strong>Automated evaluation</strong> — interview transcripts are scored after the
-                        session ends; unit tests cover the evaluator in <code>evaluator.test.ts</code></li>
-                </ul>
-            </section>
-
-            <section class="description">
-                <h2 id="stack">Tech stack</h2>
-                <ul>
-                    <li><strong>Engine:</strong> Unity 6000.3.6f1 (HDRP, XR)</li>
-                    <li><strong>Backend runtime:</strong> Bun + TypeScript</li>
-                    <li><strong>Audio analysis:</strong> Python (prosody)</li>
-                    <li><strong>LLM:</strong> Ollama with custom Modelfiles</li>
-                    <li><strong>STT:</strong> whisper.cpp (<code>ggml-base.en</code>)</li>
-                    <li><strong>TTS:</strong> ElevenLabs and Piper</li>
-                    <li><strong>Characters:</strong> Reallusion Character Creator / iClone tools</li>
-                    <li><strong>Containerization:</strong> Docker Compose (Bun + Python services)</li>
-                    <li><strong>CI:</strong> GitHub Actions for backend tests</li>
-                </ul>
-            </section>
-
-            <section class="description">
-                <h2 id="diagrams">Diagrams</h2>
-                <p>
-                    Source links for all current diagrams are listed in
-                    <code>DIAGRAMS.md</code>. The page will embed rendered versions here.
-                </p>
-                <ul>
-                    <li>System architecture (component)</li>
-                    <li>Deployment diagram</li>
-                    <li>Use case diagram</li>
-                    <li>Conversation turn — sequence</li>
-                    <li>Backchannel — sequence</li>
-                    <li>Interview evaluation — sequence</li>
-                    <li>Interview phase flow (activity)</li>
-                    <li>NPC gaze state machine</li>
-                    <li>Class diagram (Unity scripts)</li>
-                    <li>Data flow diagram (DFD)</li>
-                </ul>
-                <p class="todo"><em>TODO: embed rendered diagram images.</em></p>
-            </section>
-
-            <section class="description">
-                <h2 id="results">Results</h2>
-                <p class="todo">
-                    <em>TODO: latency measurements, turn-taking accuracy, backchannel timing,
-                    user study findings, and qualitative observations will go here.</em>
-                </p>
-            </section>
-
-            <section class="description">
-                <h2 id="repo">Repository</h2>
-                <p>
-                    Source code, setup instructions, and the Unity project live in the project
-                    repository. See the top-level <code>README.md</code> for model setup
-                    (Whisper) and the server <code>README.md</code> for running the Bun WebSocket
-                    server and creating the custom Ollama interviewer model.
-                </p>
-            </section>
+            <section class="description" data-include="sections/architecture.html"></section>
+            <section class="description" data-include="sections/features.html"></section>
+            <section class="description" data-include="sections/stack.html"></section>
+            <section class="description" data-include="sections/diagrams.html"></section>
+            <section class="description" data-include="sections/results.html"></section>
+            <section class="description" data-include="sections/repo.html"></section>
         </div>
 
         <footer>
             <p>AAU Medialogy · P8 · Draft page — content will be expanded as the project progresses.</p>
         </footer>
     </div>
+
+    <script>
+        // Load partial HTML files declared via [data-include="path"].
+        // After load, re-jump to the URL hash so deep links still scroll into view.
+        (async () => {
+            const targets = document.querySelectorAll('[data-include]');
+            await Promise.all([...targets].map(async (el) => {
+                const path = el.getAttribute('data-include');
+                try {
+                    const res = await fetch(path);
+                    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+                    el.innerHTML = await res.text();
+                } catch (err) {
+                    el.innerHTML = '<p class="todo"><em>Failed to load ' + path + ': ' + err.message + '</em></p>';
+                }
+            }));
+            if (location.hash) {
+                const target = document.querySelector(location.hash);
+                if (target) target.scrollIntoView();
+            }
+        })();
+    </script>
 </body>
 </html>

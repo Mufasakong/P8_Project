@@ -1,0 +1,25 @@
+<h2 id="architecture">System architecture</h2>
+<p>The prototype is split into a Unity client and a local backend:</p>
+<ul>
+    <li><strong>Unity VR client</strong> (<code>P8-IMMEXP26/</code>) — HDRP scene, XR rig,
+        Reallusion CC characters, NPC behavior scripts, animation and gaze controllers,
+        and a WebSocket client</li>
+    <li><strong>Bun WebSocket server</strong> (<code>server/index.ts</code>) — the main
+        orchestrator, routing speech, dialogue, and control messages between Unity and the
+        other services</li>
+    <li><strong>Prosody server</strong> (<code>server/prosody_server.py</code>,
+        <code>prosody_core.py</code>) — Python service that analyzes audio features used
+        for turn-taking and backchannel decisions</li>
+    <li><strong>Ollama</strong> — runs local LLMs with custom Modelfiles
+        (<code>server/modelfiles/Modelfile.interviewer</code>) to drive interviewer NPCs</li>
+    <li><strong>Whisper.cpp</strong> — local speech-to-text using
+        <code>ggml-base.en.bin</code> in <code>Assets/StreamingAssets/Whisper/</code></li>
+    <li><strong>ElevenLabs / Piper TTS</strong> (<code>server/elevenlabs.ts</code>,
+        <code>Assets/Piper/</code>) — speech synthesis, with a local Piper option for the
+        fully offline path</li>
+    <li><strong>Evaluator</strong> (<code>server/evaluator.ts</code>) — post-session module
+        that scores the interview based on the conversation log</li>
+</ul>
+<p class="todo">
+    <em>TODO: insert system architecture diagram (see <code>DIAGRAMS.md</code> #1).</em>
+</p>
