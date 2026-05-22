@@ -50,6 +50,7 @@ public class LatencyEvaluator : MonoBehaviour
 
         // Timestamps (ticks)
         public long speechStartTick;
+        public long speechEndTick;
         public long inputSentTick;
         public long firstTokenTick;
         public long firstAudioTick;
@@ -227,6 +228,15 @@ public class LatencyEvaluator : MonoBehaviour
         Debug.Log($"[Latency] Measurement started: {currentMeasurement.testId}");
     }
 
+    public void MarkSpeechEnd()
+    {
+        if (isMeasuring && currentMeasurement != null && currentMeasurement.speechEndTick == 0)
+        {
+            currentMeasurement.speechEndTick = DateTime.UtcNow.Ticks;
+            Debug.Log("[Latency] Speech Ended");
+        }
+    }
+
     public void MarkInputSent()
     {
         if (!isMeasuring)
@@ -272,8 +282,11 @@ public class LatencyEvaluator : MonoBehaviour
 
         long freq = TimeSpan.TicksPerMillisecond;
 
-        if (currentMeasurement.inputSentTick > currentMeasurement.speechStartTick)
-            currentMeasurement.sttLatencyMs = (currentMeasurement.inputSentTick - currentMeasurement.speechStartTick) / (double)freq;
+        // Use speechEndTick if available to measure actual STT transcribing time,
+        // otherwise it includes the time the user was talking!
+        long sttStartTick = currentMeasurement.speechEndTick > 0 ? currentMeasurement.speechEndTick : currentMeasurement.speechStartTick;
+        if (currentMeasurement.inputSentTick > sttStartTick)
+            currentMeasurement.sttLatencyMs = (currentMeasurement.inputSentTick - sttStartTick) / (double)freq;
 
         if (currentMeasurement.firstTokenTick > currentMeasurement.inputSentTick)
             currentMeasurement.ttftMs = (currentMeasurement.firstTokenTick - currentMeasurement.inputSentTick) / (double)freq;
@@ -284,9 +297,8 @@ public class LatencyEvaluator : MonoBehaviour
         if (currentMeasurement.audioEndTick > currentMeasurement.inputSentTick)
             currentMeasurement.e2eLatencyMs = (currentMeasurement.audioEndTick - currentMeasurement.inputSentTick) / (double)freq;
 
-        double generationTimeMs = currentMeasurement.firstTokenTick > 0 && currentMeasurement.audioEndTick > currentMeasurement.firstTokenTick
-            ? (currentMeasurement.audioEndTick - currentMeasurement.firstTokenTick) / (double)freq
-            : 0;
+        // Generate time for the LLM is from inputSent to firstTokenTick (which acts as the FULL generation here).
+        double generationTimeMs = currentMeasurement.ttftMs;
 
         if (generationTimeMs > 0 && tokenCount > 0)
             currentMeasurement.tokensPerSec = (tokenCount / generationTimeMs) * 1000.0;

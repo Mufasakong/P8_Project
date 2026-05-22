@@ -210,6 +210,7 @@ public class VoiceTest : MonoBehaviour
 
     async void StopAndTranscribe()
     {
+        pipelineTester?.OnUserSpeechEnded();
         int samples = Microphone.GetPosition(_micDevice);
         Microphone.End(_micDevice);
 

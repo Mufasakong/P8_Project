@@ -144,6 +144,18 @@ public class PipelineTester : MonoBehaviour
     }
 
     /// <summary>
+    /// Hook this from VoiceTest when the user's speech completes (i.e. VAD detects silence).
+    /// This prevents the STT latency measurement from including the time the user spent talking.
+    /// </summary>
+    public void OnUserSpeechEnded()
+    {
+        if (!isMonitoring || !TryGetEvaluator(out LatencyEvaluator evaluator))
+            return;
+
+        evaluator.MarkSpeechEnd();
+    }
+
+    /// <summary>
     /// Hook this from VoiceTest once user text is ready to enter the NPC pipeline.
     /// </summary>
     public void OnUserInputSubmitted(string userText)

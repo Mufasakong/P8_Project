@@ -2843,7 +2843,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: com.whisper.unity::Whisper.WhisperManager
   logLevel: 1
-  modelPath: Whisper/ggml-base.bin
+  modelPath: Whisper/ggml-base.en.bin
   isModelPathInStreamingAssets: 1
   initOnAwake: 1
   useGpu: 1
